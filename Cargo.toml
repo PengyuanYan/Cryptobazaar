@@ -1,6 +1,9 @@
 [package]
-name = "Cryptobazaar"
+name = "cryptobazaar"
 version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+icicle-runtime = { git = "https://github.com/ingonyama-zk/icicle.git" }
+icicle-core = { git = "https://github.com/ingonyama-zk/icicle.git" }
+icicle-bn254 = { git = "https://github.com/ingonyama-zk/icicle.git" }
