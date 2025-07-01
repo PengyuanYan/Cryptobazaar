@@ -196,7 +196,7 @@ where
         let lhs_affine: Affine<C1> = lhs.into();
         
         let e1: F = C1::pairing(&lhs_affine, &vk.g2).expect("pairing failed");
-        let e2: F = C1::pairing(&lhs_affine, &vk.g2).expect("pairing failed");
+        let e2: F = C1::pairing(&opening_proof, &vk.x_g2).expect("pairing failed");
 
         if e1 != e2 {
             return Err(Error::PairingNot0);
@@ -255,7 +255,7 @@ mod test_kzg {
         let x_g2 = Bn254G2CurveCfg::get_generator() * tau;
 
         let vk = VK::<Bn254CurveCfg, Bn254G2CurveCfg, Bn254PairingFieldImpl>::new(x_g2.into());
-
+        
         let verify_result = Kzg::verify(&[commit], &[eval], q, z, gamma, &vk);
         assert!(verify_result.is_ok());
     }
@@ -302,22 +302,22 @@ mod test_kzg {
         let coeffs = ScalarCfg::generate_random(size);
         let poly = Bn254DensePolynomial::from_coeffs(HostSlice::from_slice(&coeffs), size);
         let tau = Bn254ScalarField::from_u32(100u32);
-        println!("{tau}\n");
+        //println!("{tau}\n");
 
         let mut scalars = Vec::with_capacity(size);
         let mut acc = Bn254ScalarField::from_u32(1u32);
         for _ in 0..size {
             scalars.push(acc);
             acc = acc * tau;
-            println!("{acc}");
+            //println!("{acc}");
         }
         assert_eq!(scalars.len(),size);
 
-        println!("{scalars:?}");
+        //println!("{scalars:?}");
         
         let projective_g1: G1Projective = Bn254CurveCfg::get_generator();
 
-        println!("\n{projective_g1:?}");
+        //println!("\n{projective_g1:?}");
         
         let mut srs = Vec::with_capacity(size);
         for i in &scalars {
@@ -327,7 +327,7 @@ mod test_kzg {
             srs.push(affine_base);
         }
         
-        println!("\n\n\n\n\n\n\n\n\n{srs:?}\n\n\n\n\n\n\n\n\n");
+        //println!("\n\n\n\n\n\n\n\n\n{srs:?}\n\n\n\n\n\n\n\n\n");
         
         let mut cfg = MSMConfig::default();
         let mut output = vec![G1Projective::zero(); size];
@@ -340,7 +340,7 @@ mod test_kzg {
         )
         .unwrap();
 
-        println!("\n{output:?}");
+        //println!("\n{output:?}");
 
         let w = Bn254ScalarField::from_u32(10u32);
 
