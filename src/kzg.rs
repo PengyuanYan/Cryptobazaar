@@ -23,7 +23,7 @@ where
     F: FieldImpl,
     C1: Pairing<C1, C2, F>,
 {
-    _e: PhantomData<(C1, C2, F)>,
+    pub _e: PhantomData<(C1, C2, F)>,
 }
 
 pub struct PK<C1, C2, F>
@@ -34,7 +34,7 @@ where
     C1: Pairing<C1, C2, F>,
 {
     pub srs: Vec<Affine<C1>>,
-    _e: PhantomData<(C2, F)>,
+    pub _e: PhantomData<(C2, F)>,
 }
 
 pub struct VK<C1, C2, F>
@@ -91,7 +91,7 @@ where
         let mut cfg = MSMConfig::default();
         let mut projective_output = vec![Projective::<C1>::zero(); 1];
         let coeffs = get_coeffs_of_poly(poly);
-
+        
         msm::msm(
             HostSlice::from_slice(&coeffs),
             HostSlice::from_slice(&pk.srs),
@@ -155,7 +155,6 @@ where
         C1::ScalarField: Mul<Output = C1::ScalarField>,
         C1::ScalarField: Add<Output = C1::ScalarField>,
         C1::ScalarField: Sub<Output = C1::ScalarField>,
-        //F: std::ops::Mul,
     {
         assert_eq!(commitments.len(), evaluations.len());
         let powers_of_gamma: Vec<_> = std::iter::successors(Some(C1::ScalarField::one()), |p| {
@@ -302,22 +301,16 @@ mod test_kzg {
         let coeffs = ScalarCfg::generate_random(size);
         let poly = Bn254DensePolynomial::from_coeffs(HostSlice::from_slice(&coeffs), size);
         let tau = Bn254ScalarField::from_u32(100u32);
-        //println!("{tau}\n");
 
         let mut scalars = Vec::with_capacity(size);
         let mut acc = Bn254ScalarField::from_u32(1u32);
         for _ in 0..size {
             scalars.push(acc);
             acc = acc * tau;
-            //println!("{acc}");
         }
         assert_eq!(scalars.len(),size);
-
-        //println!("{scalars:?}");
         
         let projective_g1: G1Projective = Bn254CurveCfg::get_generator();
-
-        //println!("\n{projective_g1:?}");
         
         let mut srs = Vec::with_capacity(size);
         for i in &scalars {
@@ -326,8 +319,6 @@ mod test_kzg {
             Bn254CurveCfg::to_affine(&projective_base, &mut affine_base);
             srs.push(affine_base);
         }
-        
-        //println!("\n\n\n\n\n\n\n\n\n{srs:?}\n\n\n\n\n\n\n\n\n");
         
         let mut cfg = MSMConfig::default();
         let mut output = vec![G1Projective::zero(); size];
@@ -339,8 +330,6 @@ mod test_kzg {
             HostSlice::from_mut_slice(&mut output),
         )
         .unwrap();
-
-        //println!("\n{output:?}");
 
         let w = Bn254ScalarField::from_u32(10u32);
 
