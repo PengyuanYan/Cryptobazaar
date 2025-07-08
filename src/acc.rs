@@ -17,14 +17,6 @@ use std::ops::Mul;
 use icicle_runtime::memory::HostSlice;
 use icicle_core::ntt;
 
-use ark_bn254::{Bn254, Fr as F, G1Projective, G2Projective};
-use ark_ec::pairing::Pairing as OtherPairing;
-use ark_ff::{FftField, Field, One};
-use ark_poly::{
-    univariate::DensePolynomial, DenseUVPolynomial, EvaluationDomain, GeneralEvaluationDomain,
-    Polynomial,
-};
-
 pub mod structs;
 mod tr;
 
@@ -117,7 +109,7 @@ where
         tr.send_instance(instance);
         tr.send_q(&proof.q);
         let beta = tr.get_beta();
-        
+
         let kzg_at_one = Kzg::verify(
             &[instance.acc_cm],
             &[C1::ScalarField::one()],
