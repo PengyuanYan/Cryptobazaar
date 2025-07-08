@@ -17,8 +17,6 @@ use std::ops::Mul;
 use icicle_runtime::memory::HostSlice;
 use icicle_core::ntt;
 
-
-
 use ark_bn254::{Bn254, Fr as F, G1Projective, G2Projective};
 use ark_ec::pairing::Pairing as OtherPairing;
 use ark_ff::{FftField, Field, One};
@@ -26,8 +24,6 @@ use ark_poly::{
     univariate::DensePolynomial, DenseUVPolynomial, EvaluationDomain, GeneralEvaluationDomain,
     Polynomial,
 };
-
-
 
 pub mod structs;
 mod tr;
@@ -80,12 +76,6 @@ where
         
         tr.send_q(&q);
         let beta = tr.get_beta();
-        //let beta = C1::ScalarField::one() + C1::ScalarField::one() + C1::ScalarField::one()+ C1::ScalarField::one()+ C1::ScalarField::one() ;
-
-        let beta_1 = beta + C1::ScalarField::zero();
-        let beta_2 = beta_1 + C1::ScalarField::zero();
-
-        println!("{}", beta_1 == beta_2);
 
         let coeffs_0 = [C1::ScalarField::zero() - C1::ScalarField::one(), C1::ScalarField::one()];
         let divisor_poly_0 = P::from_coeffs(HostSlice::from_slice(&coeffs_0), 2);
@@ -94,19 +84,6 @@ where
         
         let coeffs_1 = [C1::ScalarField::zero() - beta, C1::ScalarField::one()];
         let divisor_poly_1 = P::from_coeffs(HostSlice::from_slice(&coeffs_1), 2);
-        println!("{}", divisor_poly_1.eval(&beta));
-        let test_coeffs = [C1::ScalarField::zero() - beta.inv(), C1::ScalarField::one()];
-        let test_poly = P::from_coeffs(HostSlice::from_slice(&test_coeffs), 2);
-        let x = test_poly.eval(&beta);
-        // println!("{x}");
-        // println!("{}", x + C1::ScalarField::zero());
-
-        
-        let test_coeffs2 = [C1::ScalarField::one(), C1::ScalarField::zero() - beta];
-        let test_poly2 = P::from_coeffs(HostSlice::from_slice(&test_coeffs2), 2);
-        let y = test_poly2.eval(&beta);
-        // println!("{y}");
-
         let (q_1, r_1) = witness.acc.divide(&divisor_poly_1);
         let q_1 = Kzg::commit(&pk, &q_1);
 
@@ -140,12 +117,10 @@ where
         tr.send_instance(instance);
         tr.send_q(&proof.q);
         let beta = tr.get_beta();
-        //let beta = C1::ScalarField::one() + C1::ScalarField::one() + C1::ScalarField::one()+ C1::ScalarField::one()+ C1::ScalarField::one();
-
-        let one = C1::ScalarField::one();
+        
         let kzg_at_one = Kzg::verify(
             &[instance.acc_cm],
-            &[one.clone()],
+            &[C1::ScalarField::one()],
             proof.q_0,
             C1::ScalarField::one(),
             C1::ScalarField::one(),
@@ -153,7 +128,6 @@ where
         );
         
         if !kzg_at_one.is_ok() {
-            println!("111111111111111111");
             return Err(Error::OpeningFailed);
         }
 
@@ -167,7 +141,6 @@ where
         );
 
         if !kzg_at_beta.is_ok() {
-            println!("22222222221111111111");
             return Err(Error::OpeningFailed);
         }
 
@@ -181,7 +154,6 @@ where
         );
 
         if !kzg_at_beta_sh.is_ok() {
-            println!("333333111111111111111111");
             return Err(Error::OpeningFailed);
         }
 
@@ -193,7 +165,6 @@ where
         };
 
         if !eq {
-            println!("444444444333333111111111111111111");
             return Err(Error::RelationCheck);
         }
 
