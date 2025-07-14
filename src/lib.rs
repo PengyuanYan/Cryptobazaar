@@ -4,3 +4,5 @@ pub mod acc;
 pub mod transcript;
 pub mod auctioneer;
 pub mod auditor;
+pub mod gates;
+pub mod bid_encoder;
