@@ -20,9 +20,6 @@ impl<const B: usize, C: Curve + icicle_core::msm::MSM<C>> AVAuditor<B, C> {
         let mut x = [C::ScalarField::zero() - C::ScalarField::one(); B];
         x[0] = C::ScalarField::zero();
 
-        // let mut outputs = vec![C::zero(); B];
-        // outputs[0] = C::msm(&self.first_round_msgs, &x).unwrap();
-
         let mut outputs = vec![Affine::<C>::zero(); B];
 
         let mut cfg = MSMConfig::default();
@@ -57,7 +54,6 @@ impl<const B: usize, C: Curve + icicle_core::msm::MSM<C>> AVAuditor<B, C> {
         let first_round_res = outputs;
 
         let ones = vec![C::ScalarField::one(); B];
-        // let second_round_res = C::msm(&self.second_round_msgs, &ones).unwrap().into();
         
         let mut cfg = MSMConfig::default();
         let mut projective_output = vec![Projective::<C>::zero(); 1];

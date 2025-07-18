@@ -109,7 +109,7 @@ where
         tr.send_instance(instance);
         tr.send_q(&proof.q);
         let beta = tr.get_beta();
-
+        
         let kzg_at_one = Kzg::verify(
             &[instance.acc_cm],
             &[C1::ScalarField::one()],
@@ -184,7 +184,7 @@ mod acc_tests {
 
     use icicle_core::{ntt::{
         self,
-        NTTConfig, NTTDir, NTTInitDomainConfig,
+        NTTConfig, NTTDir, NTTInitDomainConfig, ntt, initialize_domain
     }};
 
     use icicle_core::ntt::ntt_inplace;
@@ -199,24 +199,21 @@ mod acc_tests {
     use icicle_core::polynomials::UnivariatePolynomial;
 
     use icicle_core::traits::Arithmetic;
+    
     #[test]
+    
     fn test_acc() {
         let n: usize = 16;
         let rou = ntt::get_root_of_unity::<Bn254ScalarField>(n.try_into().unwrap());
 
-        ntt::initialize_domain::<Bn254ScalarField>(
-            rou,
-            &NTTInitDomainConfig::default(),
-        )
-        .unwrap();
-
         let tau = Bn254ScalarField::from_u32(17u32);
+        
         let srs = unsafe_setup_from_tau::<Bn254CurveCfg>(n - 1, tau);
+        println!("*");
         let x_g2 = Bn254G2CurveCfg::get_generator() * tau;
-
         let pk = PK::<Bn254CurveCfg, Bn254G2CurveCfg, Bn254PairingFieldImpl> { srs: srs.clone(), _e: PhantomData, };
         let vk = VK::<Bn254CurveCfg, Bn254G2CurveCfg, Bn254PairingFieldImpl>::new(x_g2.into());
-        
+        println!("*!");
         let mu = Bn254ScalarField::from_u32(100);
         let mut evals: Vec<Bn254ScalarField> = (0..n)
             .scan(Bn254ScalarField::one(), |state, _| {
@@ -225,18 +222,28 @@ mod acc_tests {
                 Some(out)
             })
             .collect();
-
+        println!("*");
         let mut cfg = NTTConfig::<Bn254ScalarField>::default();
-        ntt_inplace(HostSlice::from_mut_slice(&mut evals), NTTDir::kInverse, &cfg).unwrap();
-
-        let acc_poly = Bn254DensePolynomial::from_coeffs(HostSlice::from_slice(&evals), n);
+        initialize_domain(rou, &NTTInitDomainConfig::default()).unwrap();
+        let mut coeffs = vec![Bn254ScalarField::zero(); evals.len()];
+        ntt(
+            HostSlice::from_slice(&evals),
+            NTTDir::kInverse,
+            &cfg,
+            HostSlice::from_mut_slice(&mut coeffs),
+        );
+        
+        let acc_poly = Bn254DensePolynomial::from_coeffs(HostSlice::from_slice(&coeffs), n);
         let acc_cm   = Kzg::commit(&pk, &acc_poly);
 
         let instance = Instance::<Bn254CurveCfg> { n, mu, acc_cm };
-        let witness  = Witness { acc: acc_poly, _e: PhantomData,};
 
+        let witness  = Witness { acc: acc_poly, _e: PhantomData,};
+        
         let proof  = Argument::prove(&instance, &witness, &pk);
+        
         let check  = Argument::verify(&instance, &proof, &vk);
+
         assert!(check.is_ok());
     }
 }

@@ -55,13 +55,7 @@ where
 }
 
 
-/// Evaluate all the lagrange polynomials defined by this domain at the
-    /// point `tau`. This is computed in time O(|domain|).
-    /// Then given the evaluations of a degree d polynomial P over this domain,
-    /// where d < |domain|, `P(tau)` can be computed as
-    /// `P(tau) = sum_{i in [|Domain|]} L_{i, Domain}(tau) * P(g^i)`.
-    /// `L_{i, Domain}` is the value of the i-th lagrange coefficient
-    /// in the returned vector.
+// this function is reimplemented based on the source code of ark library
 pub fn evaluate_all_lagrange_coefficients<C: Curve>(domain: C::ScalarField, tau: C::ScalarField, n: usize) -> Vec<C::ScalarField>
 where
     <C as Curve>::ScalarField: Arithmetic,
@@ -69,19 +63,6 @@ where
     C::ScalarField: Sub<Output = C::ScalarField>,
     C::ScalarField: Add<Output = C::ScalarField>
 {
-    // Evaluate all Lagrange polynomials at tau to get the lagrange coefficients.
-        // Define the following as
-        // - H: The coset we are in, with generator g and offset h
-        // - m: The size of the coset H
-        // - Z_H: The vanishing polynomial for H. Z_H(x) = prod_{i in m} (x - hg^i) = x^m - h^m
-        // - v_i: A sequence of values, where v_0 = 1/(m * h^(m-1)), and v_{i + 1} = g * v_i
-        //
-        // We then compute L_{i,H}(tau) as `L_{i,H}(tau) = Z_H(tau) * v_i / (tau - h * g^i)`
-        //
-        // However, if tau in H, both the numerator and denominator equal 0
-        // when i corresponds to the value tau equals, and the coefficient is 0
-        // everywhere else. We handle this case separately, and we can easily
-        // detect by checking if the vanishing poly is 0.
     let size = n;
     let z_h_at_tau = tau.pow(n) - C::ScalarField::one();
     let offset = C::ScalarField::one();
@@ -90,10 +71,6 @@ where
     assert_eq!(domain.pow(n), C::ScalarField::one());
 
     if z_h_at_tau == C::ScalarField::zero() {
-        // In this case, we know that tau = hg^i, for some value i.
-            // Then i-th lagrange coefficient in this case is then simply 1,
-            // and all other lagrange coefficients are 0.
-            // Thus we find i by brute force.
         let mut u = vec![C::ScalarField::zero(); size];
         let mut omega_i = offset;
         for u_i in u.iter_mut().take(size) {
@@ -107,15 +84,6 @@ where
         u
 
     } else {
-        // In this case we have to compute `Z_H(tau) * v_i / (tau - h g^i)`
-            // for i in 0..size
-            // We actually compute this by computing (Z_H(tau) * v_i)^{-1} * (tau - h g^i)
-            // and then batch inverting to get the correct lagrange coefficients.
-            // We let `l_i = (Z_H(tau) * v_i)^-1` and `r_i = tau - h g^i`
-            // Notice that since Z_H(tau) is i-independent,
-            // and v_i = g * v_{i-1}, it follows that
-            // l_i = g^-1 * l_{i-1}
-            // TODO: consider caching the computation of l_i to save N multiplications
         let group_gen_inv = domain.inv();
 
         // v_0_inv = m * h^(m-1)

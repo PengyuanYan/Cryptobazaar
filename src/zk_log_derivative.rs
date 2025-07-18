@@ -370,7 +370,7 @@ where
             proof.b_opening * (beta * proof.s_opening + proof.f_opening) - C1::ScalarField::one()
                 == proof.q_opening * zh_eval
         };
-        println!("***");
+        
         if !formation_eq {
             return Err(Error::WellFormation);
         }

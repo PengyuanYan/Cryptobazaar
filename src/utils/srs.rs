@@ -11,7 +11,7 @@ where
     C::ScalarField: Mul<Output = C::ScalarField>,
 {
     let size = max_power + 1;
-
+    
     let mut scalars = Vec::with_capacity(size);
     let mut acc = C::ScalarField::from_u32(1u32);
 
@@ -29,6 +29,6 @@ where
         C::to_affine(&projective_base, &mut affine_base);
         srs.push(affine_base);
     }
-
+    
     srs
 }

@@ -41,11 +41,10 @@ where
     U: UnivariatePolynomial<Field = <C1 as Curve>::ScalarField>,
     <U as UnivariatePolynomial>::FieldConfig: GenerateRandom<<U as UnivariatePolynomial>::Field>,
 {
-    pub fn sample_blinder( // <R: RngCore>(
+    pub fn sample_blinder(
         sum: C1::ScalarField,
         degree: usize,
         n: u64,
-        // rng: &mut R,
     ) -> U 
     where
         <C1 as Curve>::ScalarField: Arithmetic,
@@ -60,11 +59,10 @@ where
         blinder
     }
 
-    pub fn prove( // <R: RngCore>(
+    pub fn prove(
         instance: &Instance<C1>,
         witness: &Witness<C1, U>,
         pk: &KzgPk<C1, C2, F>,
-        // rng: &mut R,
     ) -> Proof<C1> 
     where
         <C1 as Curve>::ScalarField: Arithmetic,

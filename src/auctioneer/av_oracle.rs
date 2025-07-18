@@ -196,7 +196,6 @@ mod av_oracle_tests {
         let mut av_oracle = AVOracle::<B, Bn254CurveCfg>::new();
 
         let party_secrets: Vec<_> = (0..B).map(|_| ScalarCfg::generate_random(1)[0]).collect();
-        // let first_msgs: Vec<Affine::<Bn254CurveCfg>> = party_secrets.iter().map(|mi| g.mul(*mi).into()).collect();
         
         let mut first_msgs = Vec::with_capacity(party_secrets.len());
 
@@ -231,7 +230,6 @@ mod av_oracle_tests {
         let mut av_oracle = AVOracle::<B, Bn254CurveCfg>::new();
 
         let mut party_secrets: Vec<_> = (0..B).map(|_| ScalarCfg::generate_random(1)[0]).collect();
-        // let first_msgs: Vec<G1Affine> = party_secrets.iter().map(|mi| g.mul(mi).into()).collect();
 
         let mut first_msgs = Vec::with_capacity(party_secrets.len());
 

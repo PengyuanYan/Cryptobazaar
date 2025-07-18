@@ -1,7 +1,3 @@
-// use ark_ec::CurveGroup;
-// use ark_ff::{FftField, Field};
-// use ark_poly::univariate::DensePolynomial;
-// use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use icicle_core::traits::FieldImpl;
 use icicle_core::ntt::NTTDomain;
 use icicle_core::curve::{Curve,Affine};
@@ -49,7 +45,7 @@ impl<C: Curve> CanonicalSerialize for VerifierIndex<C> {
     }
 
     fn serialized_size(&self, _compress: Compress) -> usize {
-        let base_len   = C::BaseField::zero().to_bytes_le().len();
+        let base_len = C::BaseField::zero().to_bytes_le().len();
         
         2 * base_len
     }
@@ -61,7 +57,7 @@ impl<C: Curve> CanonicalDeserialize for VerifierIndex<C> {
         _compress: Compress, // it cant change anything
         validate: Validate,
     ) -> Result<Self, SerializationError> {
-        let base_len   = C::BaseField::zero().to_bytes_le().len();
+        let base_len = C::BaseField::zero().to_bytes_le().len();
 
         let mut x_bytes = vec![0u8; base_len];
         let mut y_bytes = vec![0u8; base_len];
@@ -159,7 +155,6 @@ impl<C: Curve> CanonicalSerialize for Proof<C> {
         mut writer: W,
         _compress: Compress, // it cant change anything
     ) -> Result<(), SerializationError> {
-
         writer.write_all(&self.bid_cm.x.to_bytes_le())?;
         writer.write_all(&self.bid_cm.y.to_bytes_le())?;
 
@@ -205,7 +200,7 @@ impl<C: Curve> CanonicalSerialize for Proof<C> {
 
     fn serialized_size(&self, _compress: Compress) -> usize {
         let scalar_len = C::ScalarField::zero().to_bytes_le().len();
-        let base_len   = C::BaseField::zero().to_bytes_le().len();
+        let base_len = C::BaseField::zero().to_bytes_le().len();
 
         10 * scalar_len + 2 * base_len * 10
     }
@@ -218,15 +213,7 @@ impl<C: Curve> CanonicalDeserialize for Proof<C> {
         validate: Validate,
     ) -> Result<Self, SerializationError> {
         let scalar_len = C::ScalarField::zero().to_bytes_le().len();
-        let base_len   = C::BaseField::zero().to_bytes_le().len();
-        
-        // let mut bid_cm_x_bytes = vec![0u8; base_len];
-        // let mut bid_cm_y_bytes = vec![0u8; base_len];
-        // reader.read_exact(&mut bid_cm_x_bytes)?;
-        // reader.read_exact(&mut bid_cm_y_bytes)?;
-        // let bid_cm_x = C::BaseField::from_bytes_le(&bid_cm_x_bytes);
-        // let bid_cm_y = C::BaseField::from_bytes_le(&bid_cm_y_bytes);
-        // let bid_cm = Affine::<C> { x: bid_cm_x, y: bid_cm_y };
+        let base_len = C::BaseField::zero().to_bytes_le().len();
 
         let mut read_affine = |reader: &mut dyn Read| -> Result<Affine::<C>, std::io::Error> {
             let mut x_bytes = vec![0u8; base_len];
@@ -276,7 +263,6 @@ impl<C: Curve> CanonicalDeserialize for Proof<C> {
         let mut g_opening_buf = vec![0u8; scalar_len];
         reader.read_exact(&mut g_opening_buf)?;
         let g_opening = C::ScalarField::from_bytes_le(&g_opening_buf);
-
 
         let q_chunk_0_cm = read_affine(&mut reader)?;
         let q_chunk_1_cm = read_affine(&mut reader)?;

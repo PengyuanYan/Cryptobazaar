@@ -6,3 +6,6 @@ pub mod auctioneer;
 pub mod auditor;
 pub mod gates;
 pub mod bid_encoder;
+pub mod bidder;
+pub mod zk_log_derivative;
+pub mod verifiable_folding_sumcheck;

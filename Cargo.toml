@@ -4,11 +4,17 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-icicle-runtime = { git = "https://github.com/ingonyama-zk/icicle.git" }
-icicle-core = { git = "https://github.com/ingonyama-zk/icicle.git" }
-icicle-bn254 = { git = "https://github.com/ingonyama-zk/icicle.git" }
+icicle-runtime = { git = "https://github.com/ingonyama-zk/icicle.git", tag = "v3.9.2" }
+icicle-core = { git = "https://github.com/ingonyama-zk/icicle.git", tag = "v3.9.2"  }
+icicle-bn254 = { git = "https://github.com/ingonyama-zk/icicle.git", tag = "v3.9.2"  }
 
 merlin = "3.0.0"
 
 ark-serialize = "0.4"
 ark-std = "0.4"
+
+rand = "0.8.5"
+
+[dev-dependencies]
+rand_chacha = "0.3.1"
+

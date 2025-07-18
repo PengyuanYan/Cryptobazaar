@@ -3,16 +3,10 @@ use self::{
     enums::{AVError, OracleState},
 };
 
-// use ark_std::cfg_iter_mut;
-
 use icicle_core::curve::{Curve,Affine,Projective};
 use icicle_core::traits::FieldImpl;
 
-// #[cfg(feature = "parallel")]
-// use rayon::prelude::*;
-
 mod av_oracle;
-// mod av_oracle_dynamic;
 pub(crate) mod enums;
 
 #[derive(Clone)]

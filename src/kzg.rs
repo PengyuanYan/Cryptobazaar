@@ -261,7 +261,6 @@ mod test_kzg {
     use icicle_core::pairing::Pairing;
     
     #[test]
-    #[ignore]
     fn test_kzg_real() {
         let size = 16;
         let coeffs = ScalarCfg::generate_random(size);
@@ -293,7 +292,6 @@ mod test_kzg {
     }
     
     #[test]
-    #[ignore]
     fn test_batched_kzg_real() {
         let size = 16;
         let a_coeffs = ScalarCfg::generate_random(size);

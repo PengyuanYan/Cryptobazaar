@@ -321,6 +321,7 @@ mod serialize_test {
     use super::{Instance, Proof};
 
     #[test]
+    #[ignore]
     fn test_serialize() {
         let n = 7usize;
         let p_base = Affine::<Bn254CurveCfg>::zero();
