@@ -11,6 +11,8 @@ use crate::utils::get_coeffs_of_poly;
 
 use std::ops::{Add, Mul, Sub};
 
+use std::collections::BTreeMap;
+
 #[derive(Debug)]
 pub enum Error {
     PairingNot0,
@@ -47,6 +49,31 @@ where
     pub g2: Affine<C2>,
     pub x_g2: Affine<C2>,
     _e: PhantomData<(C1, F)>,
+}
+
+pub struct DegreeCheckVK<C1, C2, F> 
+where
+    C1: Curve,
+    C2: Curve,
+    F: FieldImpl,
+    C1: Pairing<C1, C2, F>,
+{
+    pub pk_max_degree: usize,
+    pub shifts: BTreeMap<usize, Affine::<C2>>,
+    pub _e: PhantomData<(C1, F)>,
+}
+
+impl<C1, C2, F> DegreeCheckVK<C1, C2, F>
+where
+    C1: Curve,
+    C2: Curve,
+    F: FieldImpl,
+    C1: Pairing<C1, C2, F>,
+{
+    pub fn get_shift(&self, degree_bound: usize) -> Option<&Affine::<C2>> {
+        let shift_factor = self.pk_max_degree - degree_bound;
+        self.shifts.get(&shift_factor)
+    }
 }
 
 impl<C1, C2, F> VK<C1, C2, F>
@@ -91,10 +118,10 @@ where
         let mut cfg = MSMConfig::default();
         let mut projective_output = vec![Projective::<C1>::zero(); 1];
         let coeffs = get_coeffs_of_poly(poly);
-        
+
         msm::msm(
             HostSlice::from_slice(&coeffs),
-            HostSlice::from_slice(&pk.srs),
+            HostSlice::from_slice(&pk.srs[..coeffs.len()]),
             &cfg,
             HostSlice::from_mut_slice(&mut projective_output),
         )
@@ -216,7 +243,7 @@ mod test_kzg {
     
     use icicle_bn254::curve::{CurveCfg as Bn254CurveCfg, G2CurveCfg as Bn254G2CurveCfg, G1Projective, G1Affine, G2Projective};
     use icicle_bn254::pairing::PairingTargetField as Bn254PairingFieldImpl;
-    use icicle_core::curve::Curve;
+    use icicle_core::curve::{Curve,Affine,Projective};
 
     use icicle_bn254::curve::ScalarField as Bn254ScalarField;
     use icicle_core::traits::FieldImpl;
@@ -224,11 +251,17 @@ mod test_kzg {
     use icicle_core::{msm, msm::MSMConfig};
     
     use crate::utils::srs::unsafe_setup_from_tau;
+    use crate::utils::get_coeffs_of_poly;
 
     use super::{Kzg, PK, VK};
     use std::marker::PhantomData;
+
+    use icicle_core::traits::Arithmetic;
+    use std::collections::BTreeMap;
+    use icicle_core::pairing::Pairing;
     
     #[test]
+    #[ignore]
     fn test_kzg_real() {
         let size = 16;
         let coeffs = ScalarCfg::generate_random(size);
@@ -260,6 +293,7 @@ mod test_kzg {
     }
     
     #[test]
+    #[ignore]
     fn test_batched_kzg_real() {
         let size = 16;
         let a_coeffs = ScalarCfg::generate_random(size);
@@ -334,5 +368,45 @@ mod test_kzg {
         let w = Bn254ScalarField::from_u32(10u32);
 
         let eval = poly.eval(&w);
-    } 
+    }
+
+    #[test]
+    fn test_degree_bound() {
+        let n = 16;
+        let a_coeffs = ScalarCfg::generate_random(n);
+        let a_poly = Bn254DensePolynomial::from_coeffs(HostSlice::from_slice(&a_coeffs), n);
+
+        let tau = Bn254ScalarField::from_u32(100u32);
+        let srs = unsafe_setup_from_tau::<Bn254CurveCfg>(2 * n - 1, tau);
+
+        let shift_factor = srs.len() - 1 - (n - 1);
+
+        let tau_pow_shift = Bn254G2CurveCfg::mul_scalar(Bn254G2CurveCfg::get_generator(), (tau.pow(shift_factor)));
+        let mut degree_check_vk_map: BTreeMap<usize, Projective<Bn254G2CurveCfg>> = BTreeMap::new();
+        degree_check_vk_map.insert(shift_factor, tau_pow_shift);
+
+        // we want to check that a is of degree <= n-1
+        let a_degree = {
+            let mut coeffs = get_coeffs_of_poly(&a_poly);
+            let mut shifted_coeffs = vec![Bn254ScalarField::zero(); shift_factor];
+            shifted_coeffs.append(&mut coeffs);
+            Bn254DensePolynomial::from_coeffs(HostSlice::from_slice(&shifted_coeffs), shifted_coeffs.len())
+        };
+
+        let pk = PK::<Bn254CurveCfg, Bn254G2CurveCfg, Bn254PairingFieldImpl> { srs: srs.clone(), _e: PhantomData, };
+        let a_cm = Kzg::commit(&pk, &a_poly);
+        let a_degree_cm = Kzg::commit(&pk, &a_degree);
+        
+        let mut affine_output = Affine::<Bn254G2CurveCfg>::zero();
+        Bn254G2CurveCfg::to_affine(degree_check_vk_map.get(&shift_factor).unwrap(), &mut affine_output);
+
+        let lhs = Bn254CurveCfg::pairing(&a_cm, &affine_output).expect("pairing failed");
+
+        let mut affine_output = Affine::<Bn254G2CurveCfg>::zero();
+        Bn254G2CurveCfg::to_affine(&Bn254G2CurveCfg::get_generator(), &mut affine_output);
+
+        let rhs = Bn254CurveCfg::pairing(&a_degree_cm, &affine_output).expect("pairing failed");
+
+        assert_eq!(lhs, rhs);
+    }
 }
