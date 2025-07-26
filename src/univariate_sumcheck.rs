@@ -6,7 +6,7 @@ use icicle_core::polynomials::UnivariatePolynomial;
 use icicle_runtime::memory::HostSlice;
 use crate::utils::get_coeffs_of_poly;
 use icicle_core::traits::Arithmetic;
-use std::ops::{Mul, Add};
+use icicle_core::ntt::{get_root_of_unity,initialize_domain,NTTInitDomainConfig,NTTDomain};
 
 use structs::{Instance, Proof, Witness};
 
@@ -55,14 +55,17 @@ where
     ) -> Proof<C1> 
     where
         <C1 as Curve>::ScalarField: Arithmetic,
-        for<'a> &'a U: Add<&'a U, Output = U> + Mul<&'a U, Output = U>,
+        <<C1 as Curve>::ScalarField as FieldImpl>::Config: NTTDomain<<C1 as Curve>::ScalarField>
     {
         assert!(is_pow_2(instance.n));
         let mut tr = Transcript::new(b"univariate-sumcheck");
 
         tr.send_instance(instance);
 
-        let ab = &witness.a_poly * &witness.b_poly;
+        let len = instance.n + 1;
+        let poly_domain = get_root_of_unity::<C1::ScalarField>(len as u64);
+        initialize_domain(poly_domain, &NTTInitDomainConfig::default()).unwrap();
+        let ab = witness.a_poly.mul(&witness.b_poly);
 
         let len = instance.n + 1;
         let mut vanishing_poly_coeffs = Vec::with_capacity(len);
@@ -127,7 +130,6 @@ where
         <C1 as Curve>::ScalarField: Arithmetic,
     {
         assert!(is_pow_2(instance.n));
-        // let domain = GeneralEvaluationDomain::new(instance.n).unwrap();
 
         let commitments = [
             instance.a_cm.clone(),
@@ -178,7 +180,7 @@ where
                 + proof.q_opening * (opening_challenge.pow(instance.n) - C1::ScalarField::one())
         };
 
-        assert_eq!(lhs, rhs);
+        assert_eq!(lhs, rhs); //sometimes may fail
 
         Ok(())
     }
@@ -201,12 +203,8 @@ mod tests {
     
     use icicle_bn254::polynomials::DensePolynomial as Bn254Poly;
     use icicle_core::ntt::{ntt, NTTDomain, NTTInitDomainConfig, NTTConfig, NTTDir, get_root_of_unity, initialize_domain, NTT};
-    // use icicle_core::{msm, msm::MSMConfig};
-    
-    use crate::utils::srs::unsafe_setup_from_tau;
-    // use crate::utils::get_coeffs_of_poly;
 
-    // use super::{Kzg, PK, VK};
+    use crate::utils::srs::unsafe_setup_from_tau;
     use std::marker::PhantomData;
 
     use icicle_core::traits::Arithmetic;
@@ -234,20 +232,21 @@ mod tests {
             NTTDir::kForward,
             &cfg,
             HostSlice::from_mut_slice(&mut a_evals),
-        );
+        )
+        .unwrap();
 
         let b_coeffs = ScalarCfg::generate_random(n as usize);
         let b_poly = Bn254Poly::from_coeffs(HostSlice::from_slice(&b_coeffs), n as usize);
 
-        initialize_domain(domain, &NTTInitDomainConfig::default()).unwrap();
         let mut b_evals = vec![Bn254ScalarField::zero(); n as usize];
-
+        //domain
         ntt(
             HostSlice::from_slice(&b_coeffs),
             NTTDir::kForward,
             &cfg,
             HostSlice::from_mut_slice(&mut b_evals),
-        );
+        )
+        .unwrap();
 
         let mut sum = Bn254ScalarField::zero();
         for i in 0..a_evals.len() {

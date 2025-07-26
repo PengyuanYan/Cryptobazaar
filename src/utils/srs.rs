@@ -1,6 +1,6 @@
 use icicle_core::curve::{Curve, Affine, Projective};
 use icicle_core::traits::FieldImpl;
-use std::ops::Mul;
+use icicle_core::traits::Arithmetic;
 
 pub fn unsafe_setup_from_tau<C>(
      max_power: usize,
@@ -8,7 +8,7 @@ pub fn unsafe_setup_from_tau<C>(
 ) -> Vec<Affine<C>>
 where
     C: Curve,
-    C::ScalarField: Mul<Output = C::ScalarField>,
+    <C as Curve>::ScalarField: Arithmetic,
 {
     let size = max_power + 1;
     

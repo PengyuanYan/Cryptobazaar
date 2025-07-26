@@ -5,12 +5,8 @@ use icicle_core::ntt::{ntt, NTTDomain, NTTInitDomainConfig, NTTConfig, NTTDir, g
 use icicle_core::curve::{Curve, Affine};
 use icicle_runtime::memory::HostSlice;
 use icicle_core::traits::FieldImpl;
-use std::ops::Sub;
-use std::ops::Mul;
-use std::ops::Add;
 use icicle_core::traits::Arithmetic;
 use std::marker::PhantomData;
-
 
 pub struct BidEncoder<const P: usize, const N: usize, C: Curve> {
     pub(crate) bid: [C::ScalarField; N],
@@ -66,9 +62,6 @@ impl<const P: usize, const N: usize, C: Curve> BidEncoder<P, N, C> {
         C: Curve,
         U: UnivariatePolynomial<Field = C::ScalarField>,
         <<C as Curve>::ScalarField as FieldImpl>::Config: NTTDomain<<C as Curve>::ScalarField>,
-        <C as Curve>::ScalarField: Sub<Output = C::ScalarField>,
-        <C as Curve>::ScalarField: Mul<Output = C::ScalarField>,
-        <C as Curve>::ScalarField: Add<Output = C::ScalarField>,
         <<C as Curve>::ScalarField as FieldImpl>::Config: NTT<<C as Curve>::ScalarField, <C as Curve>::ScalarField>,
         <C as Curve>::ScalarField: Arithmetic,
     {
@@ -84,28 +77,31 @@ impl<const P: usize, const N: usize, C: Curve> BidEncoder<P, N, C> {
             NTTDir::kInverse,
             &cfg,
             HostSlice::from_mut_slice(&mut bid_coeffs),
-        );
+        )
+        .unwrap();
         let bid = UnivariatePolynomial::from_coeffs(HostSlice::from_slice(&bid_coeffs), bid_coeffs.len());
 
         let mut f_coeffs = vec![C::ScalarField::zero(); N];
-        initialize_domain(domain, &NTTInitDomainConfig::default()).unwrap();
+        //domain
         ntt(
             HostSlice::from_slice(&self.f),
             NTTDir::kInverse,
             &cfg,
             HostSlice::from_mut_slice(&mut f_coeffs),
-        );
+        )
+        .unwrap();
         let f = UnivariatePolynomial::from_coeffs(HostSlice::from_slice(&f_coeffs), f_coeffs.len());
 
 
         let mut r_coeffs = vec![C::ScalarField::zero(); N];
-        initialize_domain(domain, &NTTInitDomainConfig::default()).unwrap();
+        //domain
         ntt(
             HostSlice::from_slice(&self.r),
             NTTDir::kInverse,
             &cfg,
             HostSlice::from_mut_slice(&mut r_coeffs),
-        );
+        )
+        .unwrap();
         let r = UnivariatePolynomial::from_coeffs(HostSlice::from_slice(&r_coeffs), r_coeffs.len());
 
         let mut r_inv_evals = self.r[0..P].to_vec();
@@ -115,7 +111,7 @@ impl<const P: usize, const N: usize, C: Curve> BidEncoder<P, N, C> {
 
         let mut r_inv_blinders = Self::sample_blinders(&mut rng, N - P);
         r_inv_evals.append(&mut r_inv_blinders);
-        initialize_domain(domain, &NTTInitDomainConfig::default()).unwrap();
+        //domain
         ntt_inplace(HostSlice::from_mut_slice(&mut r_inv_evals), NTTDir::kInverse, &cfg).unwrap();
         let r_inv = UnivariatePolynomial::from_coeffs(HostSlice::from_slice(&r_inv_evals), r_inv_evals.len());
         
@@ -133,22 +129,24 @@ impl<const P: usize, const N: usize, C: Curve> BidEncoder<P, N, C> {
         g_evals.append(&mut g_blinders);
 
         let mut diff_ntt_evals = vec![C::ScalarField::zero(); N];
-        initialize_domain(domain, &NTTInitDomainConfig::default()).unwrap();
+        //domain
         ntt(
             HostSlice::from_slice(&diff_evals[..N]),
             NTTDir::kInverse,
             &cfg,
             HostSlice::from_mut_slice(&mut diff_ntt_evals),
-        );
+        )
+        .unwrap();
 
         let mut g_ntt_evals = vec![C::ScalarField::zero(); N];
-        initialize_domain(domain, &NTTInitDomainConfig::default()).unwrap();
+        //domain
         ntt(
             HostSlice::from_slice(&g_evals[..N]),
             NTTDir::kInverse,
             &cfg,
             HostSlice::from_mut_slice(&mut g_ntt_evals),
-        );
+        )
+        .unwrap();
 
         let diff = UnivariatePolynomial::from_coeffs(HostSlice::from_slice(&diff_ntt_evals), diff_ntt_evals.len());
         let g = UnivariatePolynomial::from_coeffs(HostSlice::from_slice(&g_ntt_evals), g_ntt_evals.len());
@@ -181,8 +179,7 @@ impl<const P: usize, const N: usize, C: Curve> BidEncoder<P, N, C> {
 
     pub fn to_second_av_round(&self, basis: &[Affine::<C>]) -> Vec<Affine::<C>> 
     where
-        <C as Curve>::ScalarField: Mul<Output = C::ScalarField>,
-        <C as Curve>::ScalarField: Add<Output = C::ScalarField>
+        <C as Curve>::ScalarField: Arithmetic,
     {
         let mut result = Vec::with_capacity(self.f.len());
 
@@ -233,7 +230,6 @@ mod encoder_tests {
     #[test]
     fn test_encode() {
         let bid = 4usize;
-        // let enc = [1, 1, 1, 1, 0, 0, r1, r2];
         let enc = [Bn254ScalarField::one(), Bn254ScalarField::one(), Bn254ScalarField::one(), Bn254ScalarField::one(), Bn254ScalarField::zero(), Bn254ScalarField::zero()];
 
         let seed: [u8; 32] = [

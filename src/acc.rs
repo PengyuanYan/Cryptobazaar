@@ -11,8 +11,7 @@ use self::{
 };
 
 use icicle_core::polynomials::UnivariatePolynomial;
-use icicle_core::ntt::{NTTDomain, NTTInitDomainConfig};
-use std::ops::Mul;
+use icicle_core::ntt::NTTDomain;
 
 use icicle_runtime::memory::HostSlice;
 use icicle_core::ntt;
@@ -44,7 +43,7 @@ where
     ) -> Proof<C1> 
     where
         P: UnivariatePolynomial<Field = C1::ScalarField>,
-        <C1 as Curve>::ScalarField: Arithmetic + Mul<Output = <C1 as Curve>::ScalarField>,
+        <C1 as Curve>::ScalarField: Arithmetic,
         <<C1 as Curve>::ScalarField as FieldImpl>::Config: NTTDomain<<C1 as Curve>::ScalarField>
     {
         let mut tr = Transcript::new(b"acc-transcript");
@@ -100,7 +99,7 @@ where
         vk: &KzgVk<C1, C2, F>,
     ) -> Result<(), Error> 
     where 
-        <C1 as Curve>::ScalarField: Arithmetic + Mul<Output = <C1 as Curve>::ScalarField>,
+        <C1 as Curve>::ScalarField: Arithmetic,
         <<C1 as Curve>::ScalarField as FieldImpl>::Config: NTTDomain<<C1 as Curve>::ScalarField>
     {
         let n: usize = instance.n;
@@ -205,15 +204,13 @@ mod acc_tests {
     fn test_acc() {
         let n: usize = 16;
         let rou = ntt::get_root_of_unity::<Bn254ScalarField>(n.try_into().unwrap());
-
         let tau = Bn254ScalarField::from_u32(17u32);
-        
         let srs = unsafe_setup_from_tau::<Bn254CurveCfg>(n - 1, tau);
-        println!("*");
+
         let x_g2 = Bn254G2CurveCfg::get_generator() * tau;
         let pk = PK::<Bn254CurveCfg, Bn254G2CurveCfg, Bn254PairingFieldImpl> { srs: srs.clone(), _e: PhantomData, };
         let vk = VK::<Bn254CurveCfg, Bn254G2CurveCfg, Bn254PairingFieldImpl>::new(x_g2.into());
-        println!("*!");
+
         let mu = Bn254ScalarField::from_u32(100);
         let mut evals: Vec<Bn254ScalarField> = (0..n)
             .scan(Bn254ScalarField::one(), |state, _| {
@@ -222,7 +219,7 @@ mod acc_tests {
                 Some(out)
             })
             .collect();
-        println!("*");
+
         let mut cfg = NTTConfig::<Bn254ScalarField>::default();
         initialize_domain(rou, &NTTInitDomainConfig::default()).unwrap();
         let mut coeffs = vec![Bn254ScalarField::zero(); evals.len()];
@@ -231,7 +228,8 @@ mod acc_tests {
             NTTDir::kInverse,
             &cfg,
             HostSlice::from_mut_slice(&mut coeffs),
-        );
+        )
+        .unwrap();
         
         let acc_poly = Bn254DensePolynomial::from_coeffs(HostSlice::from_slice(&coeffs), n);
         let acc_cm   = Kzg::commit(&pk, &acc_poly);

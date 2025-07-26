@@ -7,16 +7,15 @@
 
     degree of quotient will be n - 1 + n - 1 + n - 1 - n = 3n - 3 - n = 2n - 3, so we can work with subgroup of 2n
 */
-use icicle_core::curve::{Curve,Affine,Projective};
+use icicle_core::curve::Curve;
 use icicle_core::pairing::Pairing;
 use icicle_core::traits::FieldImpl;
 use std::marker::PhantomData;
 use icicle_core::polynomials::UnivariatePolynomial;
-use icicle_core::ntt::{ntt, NTTDomain, NTTInitDomainConfig, NTTConfig, NTTDir, get_root_of_unity, initialize_domain, ntt_inplace, NTT, release_domain};
+use icicle_core::ntt::{ntt, NTTDomain, NTTInitDomainConfig, NTTConfig, NTTDir, get_root_of_unity, initialize_domain, NTT, release_domain};
 use icicle_runtime::memory::HostSlice;
 use icicle_runtime::memory::HostOrDeviceSlice;
 use icicle_core::traits::Arithmetic;
-use core::ops::Add;
 use icicle_core::msm;
 
 use crate::{
@@ -75,7 +74,8 @@ where
             NTTDir::kInverse,
             &cfg,
             HostSlice::from_mut_slice(&mut coeffs),
-        );
+        )
+        .unwrap();
         
         U::from_coeffs(HostSlice::from_slice(&coeffs), N) 
     }
@@ -98,8 +98,8 @@ where
         <<C1 as Curve>::ScalarField as FieldImpl>::Config: NTTDomain<<C1 as Curve>::ScalarField> + NTT<<C1 as Curve>::ScalarField, <C1 as Curve>::ScalarField>,
         <C1 as Curve>::ScalarField: Arithmetic,
      {
-        let domain_n = get_root_of_unity::<C1::ScalarField>(N.try_into().unwrap());
         let domain_2n = get_root_of_unity::<C1::ScalarField>((2 * N).try_into().unwrap());
+        initialize_domain(domain_2n, &NTTInitDomainConfig::default()).unwrap();
 
         let g = C1::ScalarField::from_u32(5u32);
         let mut twist = vec![C1::ScalarField::zero(); 2 * N];
@@ -119,25 +119,27 @@ where
         }
 
         let mut q_price_coset_evals = vec![C1::ScalarField::zero(); 2 * N];
-        initialize_domain(domain_2n, &NTTInitDomainConfig::default()).unwrap();
+        //domain_2n
         ntt(
             HostSlice::from_slice(&q_price_coeffs),
             NTTDir::kForward,
             &cfg,
             HostSlice::from_mut_slice(&mut q_price_coset_evals),
-        );
-        
+        )
+        .unwrap();
+
         let mut l_p_evals = vec![C1::ScalarField::zero(); N];
         l_p_evals[P] = C1::ScalarField::one();
 
         let mut l_p = vec![C1::ScalarField::zero(); N];
-        initialize_domain(domain_n, &NTTInitDomainConfig::default()).unwrap();
+        //domain_n
         ntt(
             HostSlice::from_slice(&l_p_evals),
             NTTDir::kInverse,
             &cfg,
             HostSlice::from_mut_slice(&mut l_p),
-        );
+        )
+        .unwrap();
 
         let mut l_p_coset_evals = vec![C1::ScalarField::zero(); 2 * N];
         l_p.resize(2 * N, C1::ScalarField::zero());
@@ -145,13 +147,14 @@ where
             l_p[i] = l_p[i] * twist[i];
         }
 
-        initialize_domain(domain_2n, &NTTInitDomainConfig::default()).unwrap();
+        //domain_2n
         ntt(
             HostSlice::from_slice(&l_p),
             NTTDir::kForward,
             &cfg,
             HostSlice::from_mut_slice(&mut l_p_coset_evals),
-        );
+        )
+        .unwrap();
 
         ProverIndex {
             q_price,
@@ -171,12 +174,12 @@ where
         <C1 as Curve>::ScalarField: FieldImpl,
         <<C1 as Curve>::ScalarField as FieldImpl>::Config: NTTDomain<<C1 as Curve>::ScalarField> + NTT<<C1 as Curve>::ScalarField, <C1 as Curve>::ScalarField>,
         <C1 as Curve>::ScalarField: Arithmetic,
-        for<'a> &'a U: Add<&'a U, Output = U>,
     {
         let k = 2;
 
         let domain_n = get_root_of_unity::<C1::ScalarField>(N.try_into().unwrap());
         let domain_kn = get_root_of_unity::<C1::ScalarField>((k * N).try_into().unwrap());
+        initialize_domain(domain_kn, &NTTInitDomainConfig::default()).unwrap();
         
         let mut tr = Transcript::<C1>::new(b"gates-transcript");
         tr.send_index(v_index);
@@ -210,13 +213,14 @@ where
             bid_coeffs[i] = bid_coeffs[i] * twist[i];
         }
 
-        initialize_domain(domain_kn, &NTTInitDomainConfig::default()).unwrap();
+        //domain_kn
         ntt(
             HostSlice::from_slice(&bid_coeffs),
             NTTDir::kForward,
             &cfg,
             HostSlice::from_mut_slice(&mut bid_coset_evals),
-        );
+        )
+        .unwrap();
         let bid_coset_evals = Oracle(&bid_coset_evals);
         
         let mut f_coeffs = get_coeffs_of_poly(&witness.f);
@@ -227,13 +231,14 @@ where
             f_coeffs[i] = f_coeffs[i] * twist[i];
         }
 
-        initialize_domain(domain_kn, &NTTInitDomainConfig::default()).unwrap();
+        //domain_kn
         ntt(
             HostSlice::from_slice(&f_coeffs),
             NTTDir::kForward,
             &cfg,
             HostSlice::from_mut_slice(&mut f_coset_evals),
-        );
+        )
+        .unwrap();
         let f_coset_evals = Oracle(&f_coset_evals);
 
         let mut r_coeffs = get_coeffs_of_poly(&witness.r);
@@ -244,13 +249,14 @@ where
             r_coeffs[i] = r_coeffs[i] * twist[i];
         }
 
-        initialize_domain(domain_kn, &NTTInitDomainConfig::default()).unwrap();
+        //domain_kn
         ntt(
             HostSlice::from_slice(&r_coeffs),
             NTTDir::kForward,
             &cfg,
             HostSlice::from_mut_slice(&mut r_coset_evals),
-        );
+        )
+        .unwrap();
         let r_coset_evals = Oracle(&r_coset_evals);
 
         let mut r_inv_coeffs = get_coeffs_of_poly(&witness.r_inv);
@@ -261,13 +267,14 @@ where
             r_inv_coeffs[i] = r_inv_coeffs[i] * twist[i];
         }
 
-        initialize_domain(domain_kn, &NTTInitDomainConfig::default()).unwrap();
+        //domain_kn
         ntt(
             HostSlice::from_slice(&r_inv_coeffs),
             NTTDir::kForward,
             &cfg,
             HostSlice::from_mut_slice(&mut r_inv_coset_evals),
-        );
+        )
+        .unwrap();
         let r_inv_coset_evals = Oracle(&r_inv_coset_evals);
 
         let mut diff_coeffs = get_coeffs_of_poly(&witness.diff);
@@ -278,13 +285,14 @@ where
             diff_coeffs[i] = diff_coeffs[i] * twist[i];
         }
 
-        initialize_domain(domain_kn, &NTTInitDomainConfig::default()).unwrap();
+        //domain_kn
         ntt(
             HostSlice::from_slice(&diff_coeffs),
             NTTDir::kForward,
             &cfg,
             HostSlice::from_mut_slice(&mut diff_coset_evals),
-        );
+        )
+        .unwrap();
         let diff_coset_evals = Oracle(&diff_coset_evals);
 
         let mut g_coeffs = get_coeffs_of_poly(&witness.g);
@@ -295,13 +303,14 @@ where
             g_coeffs[i] = g_coeffs[i] * twist[i];
         }
 
-        initialize_domain(domain_kn, &NTTInitDomainConfig::default()).unwrap();
+        //domain_kn
         ntt(
             HostSlice::from_slice(&g_coeffs),
             NTTDir::kForward,
             &cfg,
             HostSlice::from_mut_slice(&mut g_coset_evals),
-        );
+        )
+        .unwrap();
         let g_coset_evals = Oracle(&g_coset_evals);
 
         let q_price_coset_evals = Oracle(&index.q_price_coset_evals);
@@ -347,13 +356,14 @@ where
         }
 
         let mut q = vec![C1::ScalarField::zero(); q_coset_evals.len()];
-        initialize_domain(domain_kn, &NTTInitDomainConfig::default()).unwrap();
+        //domain_kn
         ntt(
             HostSlice::from_slice(&q_coset_evals),
             NTTDir::kInverse,
             &cfg,
             HostSlice::from_mut_slice(&mut q),
-        );
+        )
+        .unwrap();
 
         for i in 0..q.len() {
             q[i] = q[i] * (twist[i].inv());
@@ -448,7 +458,6 @@ where
     where
         <<C1 as Curve>::ScalarField as FieldImpl>::Config: NTTDomain<<C1 as Curve>::ScalarField>,
         <C1 as Curve>::ScalarField: Arithmetic
-    
     {
         let domain = get_root_of_unity::<C1::ScalarField>(N.try_into().unwrap());
         let mut tr = Transcript::<C1>::new(b"gates-transcript");
@@ -642,6 +651,7 @@ mod ntt_test {
         let N = 16;
         let domain_n = get_root_of_unity::<Bn254ScalarField>(N.try_into().unwrap());
         let domain_2n = get_root_of_unity::<Bn254ScalarField>((2 * N).try_into().unwrap());
+        initialize_domain(domain_2n, &NTTInitDomainConfig::default()).unwrap();
         
         let g = Bn254ScalarField::from_u32(5u32);
         let cfg = NTTConfig::<Bn254ScalarField>::default();
@@ -677,35 +687,38 @@ mod ntt_test {
         }
 
         let mut q = vec![Bn254ScalarField::zero(); target.len()];
-        initialize_domain(domain_2n, &NTTInitDomainConfig::default()).unwrap();
+        //domain_2n
         ntt(
             HostSlice::from_slice(&target),
             NTTDir::kForward,
             &cfg_2n,
             HostSlice::from_mut_slice(&mut q),
-        );
+        )
+        .unwrap();
         
         let mut q_copy = vec![Bn254ScalarField::zero(); target_copy.len()];
-        initialize_domain(domain_2n, &NTTInitDomainConfig::default()).unwrap();
+        //domain_2n
         ntt(
             HostSlice::from_slice(&target_copy),
             NTTDir::kForward,
             &cfg_2n,
             HostSlice::from_mut_slice(&mut q_copy),
-        );
+        )
+        .unwrap();
         
         let mut q_g = vec![Bn254ScalarField::zero(); target_copy.len()];
-        initialize_domain(domain_2n, &NTTInitDomainConfig::default()).unwrap();
+        //domain_2n
         ntt(
             HostSlice::from_slice(&target_copy_2),
             NTTDir::kForward,
             &cfg,
             HostSlice::from_mut_slice(&mut q_g),
-        );
+        )
+        .unwrap();
         assert_eq!(q_g, q_copy);
 
         let mut q_copy_inv = vec![Bn254ScalarField::zero(); target_copy.len()];
-        initialize_domain(domain_2n, &NTTInitDomainConfig::default()).unwrap();
+        //domain_2n
         ntt(
             HostSlice::from_slice(&q_copy),
             NTTDir::kInverse,
@@ -716,13 +729,14 @@ mod ntt_test {
         assert_eq!(q_copy_inv, target_copy);
 
         let mut q_g_inv = vec![Bn254ScalarField::zero(); q_g.len()];
-        initialize_domain(domain_2n, &NTTInitDomainConfig::default()).unwrap();
+        //domain_2n
         ntt(
             HostSlice::from_slice(&q_g),
             NTTDir::kInverse,
             &cfg,
             HostSlice::from_mut_slice(&mut q_g_inv),
-        );
+        )
+        .unwrap();
         
         for i in 0..(2 * N) {
             q_g_inv[i] = twist[i].inv() * q_g_inv[i];

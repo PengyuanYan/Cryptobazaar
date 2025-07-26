@@ -3,8 +3,7 @@ use self::{
     enums::{AVError, OracleState},
 };
 
-use icicle_core::curve::{Curve,Affine,Projective};
-use icicle_core::traits::FieldImpl;
+use icicle_core::curve::{Curve,Affine};
 
 mod av_oracle;
 pub(crate) mod enums;

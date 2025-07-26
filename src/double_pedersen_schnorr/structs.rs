@@ -258,7 +258,7 @@ mod serialize_test {
                            };
         
         let mut data = Vec::new();
-        proof.serialize_with_mode(&mut data, Compress::No);
+        proof.serialize_with_mode(&mut data, Compress::No).unwrap();
 
         let mut reader: &[u8] = &data;
         let result = Proof::<Bn254CurveCfg>::deserialize_with_mode(&mut reader, Compress::No, Validate::No).unwrap();

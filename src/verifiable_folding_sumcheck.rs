@@ -5,7 +5,7 @@ use std::marker::PhantomData;
 use icicle_core::polynomials::UnivariatePolynomial;
 use icicle_runtime::memory::HostSlice;
 use crate::utils::get_coeffs_of_poly;
-use icicle_core::ntt::{ntt, NTTDomain, NTTInitDomainConfig, NTTConfig, NTTDir, get_root_of_unity, initialize_domain, NTT};
+use icicle_core::ntt::{ntt, NTTDomain, NTTInitDomainConfig, NTTConfig, NTTDir, get_root_of_unity, initialize_domain, NTT, release_domain};
 use icicle_core::traits::GenerateRandom;
 use icicle_core::traits::Arithmetic;
 use std::ops::{Mul, Add};
@@ -19,7 +19,6 @@ use crate::{
     utils::{folding::compute_folding_coeffs, is_pow_2, evaluate_all_lagrange_coefficients},
     verifiable_folding_sumcheck::tr::Transcript,
 };
-
 
 pub struct Argument<C1, C2, F, U>
 where
@@ -67,7 +66,6 @@ where
     where
         <C1 as Curve>::ScalarField: Arithmetic,
         <<C1 as Curve>::ScalarField as FieldImpl>::Config: NTTDomain<<C1 as Curve>::ScalarField> + NTT<<C1 as Curve>::ScalarField, <C1 as Curve>::ScalarField>,
-        for<'a> &'a U: Add<&'a U, Output = U> + Mul<&'a U, Output = U>,
     {
         assert!(is_pow_2(instance.n));
 
@@ -82,7 +80,7 @@ where
         let mut s_affine = Affine::<C1>::zero();
         C1::to_affine(&s, &mut s_affine);
 
-        let blinder = Self::sample_blinder(b_1, 1, instance.n as u64); //, rng);
+        let blinder = Self::sample_blinder(b_1, 1, instance.n as u64);
         let blinder_cm = Kzg::commit(pk, &blinder);
         tr.send_blinders(&s_affine, &blinder_cm);
 
@@ -101,16 +99,26 @@ where
             NTTDir::kInverse,
             &cfg,
             HostSlice::from_mut_slice(&mut b_coeffs),
-        );
-
+        )
+        .unwrap();
+        release_domain::<C1::ScalarField>();
         let b = U::from_coeffs(HostSlice::from_slice(&b_coeffs), b_coeffs.len());
-
+        
         // B(X) + ca(X)b(X)
-        let lhs_product = (&witness.a * &b).mul_by_scalar(&c);
-        let lhs: U = &blinder + &lhs_product;
+        let a_nof_coeffs = witness.a.get_nof_coeffs();
+        let b_nof_coeffs:u64 = b_coeffs.len().try_into().unwrap();
+        assert_eq!(a_nof_coeffs, b_nof_coeffs);
+        let max_domain_size:u64= a_nof_coeffs + b_nof_coeffs;
+        let poly_domain = get_root_of_unity::<C1::ScalarField>(max_domain_size);
+        initialize_domain(poly_domain, &NTTInitDomainConfig::default()).unwrap();
+
+        let mut lhs_product = witness.a.mul(&b);
+        lhs_product = lhs_product.mul_by_scalar(&c);
+        let lhs: U = blinder.add(&lhs_product);
         
         let len = instance.n + 1;
         let mut vanishing_poly_coeffs = Vec::with_capacity(len);
+        release_domain::<C1::ScalarField>();
 
         vanishing_poly_coeffs.push(C1::ScalarField::zero() - C1::ScalarField::one());
         for i in 0..(len - 2) {
@@ -119,6 +127,9 @@ where
         vanishing_poly_coeffs.push(C1::ScalarField::one());
 
         let domain_vanishing_poly = U::from_coeffs(HostSlice::from_slice(&vanishing_poly_coeffs), len);
+        
+        let poly_domain = get_root_of_unity::<C1::ScalarField>(len as u64);
+        initialize_domain(poly_domain, &NTTInitDomainConfig::default()).unwrap();
 
         let (q, r) = lhs.divide(&domain_vanishing_poly);
 
@@ -131,8 +142,8 @@ where
         assert_eq!(z_1, C1::ScalarField::from_u32(instance.n as u32) * r_coeffs[0]);
 
         let r_mod_x = U::from_coeffs(HostSlice::from_slice(&r_coeffs[1..]), r_coeffs[1..].len());
-
-        // // deg(r_mod_x) <= n - 2
+        
+        // deg(r_mod_x) <= n - 2
         let r_degree = {
             let shift_factor = pk.srs.len() - 1 - (instance.n - 2);
             let mut coeffs = get_coeffs_of_poly(&r_mod_x);
@@ -156,7 +167,8 @@ where
 
         let r_opening = r_mod_x.eval(&opening_challenge);
         let q_opening = q.eval(&opening_challenge);
-
+        release_domain::<C1::ScalarField>();
+        
         tr.send_openings(&a_opening, &blinder_opening, &r_opening, &q_opening);
 
         let separation_challenge = tr.get_separation_challenge();
@@ -332,6 +344,7 @@ mod verifiable_folding_sumcheck_tests {
     };
 
     #[test]
+
     fn test_sumcheck() {
         let log_n = 4;
         let n = 1 << log_n;
@@ -375,7 +388,8 @@ mod verifiable_folding_sumcheck_tests {
             NTTDir::kForward,
             &cfg,
             HostSlice::from_mut_slice(&mut a_evals),
-        );
+        )
+        .unwrap();
 
         let challenges = ScalarCfg::generate_random(log_n);
 

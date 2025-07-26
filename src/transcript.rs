@@ -69,13 +69,12 @@ mod tr_tests {
 
         let beta_1 = beta + <Bn254CurveCfg as Curve>::ScalarField::zero();
         let beta_2 = beta_1 + <Bn254CurveCfg as Curve>::ScalarField::zero();
-
-        println!("{}",beta_1 == beta_2);
+        //println!("{}", beta_1 - beta_2);
 
         let test_coeffs = [<Bn254CurveCfg as Curve>::ScalarField::zero() - beta, <Bn254CurveCfg as Curve>::ScalarField::one()];
         let test_poly = Bn254DensePolynomial::from_coeffs(HostSlice::from_slice(&test_coeffs), 2);
         let x = test_poly.eval(&beta);
 
-        println!("{}",x);
+        //println!("{}",x);
     }
 }

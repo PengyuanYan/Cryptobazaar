@@ -5,8 +5,6 @@ use super::enums::{AVError, OracleState};
 use icicle_core::{msm, msm::MSMConfig};
 use icicle_runtime::memory::HostSlice;
 
-use std::ops::Sub;
-
 // TODO: handle errors instead of panics
 #[derive(Clone)]
 pub struct AVOracle<const B: usize, C: Curve> {

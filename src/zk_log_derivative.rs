@@ -29,8 +29,6 @@ use icicle_core::traits::Arithmetic;
 use crate::kzg::{Kzg, PK as KzgPk, VK as KzgVk};
 use crate::utils::get_coeffs_of_poly;
 use std::marker::PhantomData;
-use std::ops::Mul;
-use std::ops::Add;
 
 use self::{
     structs::{Error, Instance, Proof, ProverIndex, VerifierIndex, Witness},
@@ -58,7 +56,6 @@ where
     F: FieldImpl,
     C1: Pairing<C1, C2, F>,
     U: UnivariatePolynomial<Field = <C1 as Curve>::ScalarField>,
-    for<'a> &'a U: Add<&'a U, Output = U>
 {
     pub fn index_v(pk: &KzgPk<C1,C2,F>) -> VerifierIndex<C1> 
     where
@@ -79,7 +76,8 @@ where
             NTTDir::kInverse,
             &cfg,
             HostSlice::from_mut_slice(&mut coeffs),
-        );
+        )
+        .unwrap();
 
         let s = U::from_coeffs(HostSlice::from_slice(&coeffs), N);
         let s_cm = Kzg::commit(pk, &s);
@@ -89,7 +87,7 @@ where
 
     pub fn index_p() -> ProverIndex<C1, U> 
     where
-        <C1 as Curve>::ScalarField: Mul<Output = C1::ScalarField>,
+        <C1 as Curve>::ScalarField: Arithmetic,
         <<C1 as Curve>::ScalarField as FieldImpl>::Config: NTTDomain<<C1 as Curve>::ScalarField> + NTT<<C1 as Curve>::ScalarField, <C1 as Curve>::ScalarField>,
     {
         let domain = get_root_of_unity::<C1::ScalarField>(N.try_into().unwrap());
@@ -115,7 +113,8 @@ where
             NTTDir::kInverse,
             &cfg,
             HostSlice::from_mut_slice(&mut s_coeffs),
-        );
+        )
+        .unwrap();
         
         let s_coeffs_clone = s_coeffs.clone();
 
@@ -123,14 +122,15 @@ where
             s_coeffs[i] = s_coeffs[i] * twist[i];
         }
         
-        initialize_domain(domain, &NTTInitDomainConfig::default()).unwrap();
+        //domain
         let mut s_coset_evals = vec![C1::ScalarField::zero(); N];
         ntt(
             HostSlice::from_slice(&s_coeffs),
             NTTDir::kForward,
             &cfg,
             HostSlice::from_mut_slice(&mut s_coset_evals),
-        );
+        )
+        .unwrap();
         
         ProverIndex {
             s: U::from_coeffs(HostSlice::from_slice(&s_coeffs_clone), N),
@@ -138,7 +138,6 @@ where
         }
     }
 
-    // TODO: make more memory optimal function by using fft in place
     pub fn prove(
         index: &ProverIndex<C1, U>,
         v_index: &VerifierIndex<C1>,
@@ -148,7 +147,6 @@ where
     ) -> Proof<C1> 
     where
         <C1 as Curve>::ScalarField: Arithmetic,
-        <C1 as Curve>::ScalarField: Mul<Output = C1::ScalarField> + Add<Output = C1::ScalarField>,
         <<C1 as Curve>::ScalarField as FieldImpl>::Config: NTTDomain<<C1 as Curve>::ScalarField> + NTT<<C1 as Curve>::ScalarField, <C1 as Curve>::ScalarField>,
     {
         let domain = get_root_of_unity::<C1::ScalarField>(N.try_into().unwrap());
@@ -171,20 +169,22 @@ where
             NTTDir::kForward,
             &cfg,
             HostSlice::from_mut_slice(&mut f_evals),
-        );
+        )
+        .unwrap();
         
         for i in 0..N {
             f_coeffs[i] = f_coeffs[i] * twist[i];
         }
 
-        initialize_domain(domain, &NTTInitDomainConfig::default()).unwrap();
+        //domain
         let mut f_coset_evals = vec![C1::ScalarField::zero(); N];
         ntt(
             HostSlice::from_slice(&f_coeffs),
             NTTDir::kForward,
             &cfg,
             HostSlice::from_mut_slice(&mut f_coset_evals),
-        );
+        )
+        .unwrap();
 
         let mut tr = Transcript::new(b"log-derivative");
         tr.send_v_index(v_index);
@@ -209,14 +209,15 @@ where
         }
         b_evals.append(&mut blinders);
 
-        initialize_domain(domain, &NTTInitDomainConfig::default()).unwrap();
+        //domain
         let mut b_coeffs = vec![C1::ScalarField::zero(); N];
         ntt(
             HostSlice::from_slice(&b_evals),
             NTTDir::kInverse,
             &cfg,
             HostSlice::from_mut_slice(&mut b_coeffs),
-        );
+        )
+        .unwrap();
 
         let b = U::from_coeffs(HostSlice::from_slice(&b_coeffs), N);
         let b_cm = Kzg::commit(pk, &b);
@@ -225,14 +226,15 @@ where
             b_coeffs[i] = b_coeffs[i] * twist[i];
         }
 
-        initialize_domain(domain, &NTTInitDomainConfig::default()).unwrap();
+        //domain
         let mut b_coset_evals = vec![C1::ScalarField::zero(); N];
         ntt(
             HostSlice::from_slice(&b_coeffs),
             NTTDir::kForward,
             &cfg,
             HostSlice::from_mut_slice(&mut b_coset_evals),
-        );
+        )
+        .unwrap();
         
         let x = C1::ScalarField::from_u32(5u32);
         let zh_coset_inv = (x.pow(N.try_into().unwrap()) - C1::ScalarField::one()).inv();
@@ -247,14 +249,15 @@ where
             q_coset_evals.push(result);
         }
         
-        initialize_domain(domain, &NTTInitDomainConfig::default()).unwrap();
+        //domain
         let mut q_coeffs = vec![C1::ScalarField::zero(); N];
         ntt(
             HostSlice::from_slice(&q_coset_evals),
             NTTDir::kInverse,
             &cfg,
             HostSlice::from_mut_slice(&mut q_coeffs),
-        );
+        )
+        .unwrap();
 
         for i in 0..N {
             q_coeffs[i] = q_coeffs[i] * twist[i].inv();
@@ -311,7 +314,6 @@ where
     where
         Func: Fn(C1::ScalarField) -> C1::ScalarField,
         <C1 as Curve>::ScalarField: Arithmetic,
-        <C1 as Curve>::ScalarField: Add<Output = C1::ScalarField>,
         <<C1 as Curve>::ScalarField as FieldImpl>::Config: NTTDomain<<C1 as Curve>::ScalarField>
     {
         let domain = get_root_of_unity::<C1::ScalarField>(N.try_into().unwrap());
@@ -381,7 +383,6 @@ where
 
 #[cfg(test)]
 mod log_derivative_tests {
-    use std::ops::Mul;
     use icicle_bn254::curve::{CurveCfg as Bn254CurveCfg, G2CurveCfg as Bn254G2CurveCfg};
     use icicle_bn254::pairing::PairingTargetField as Bn254PairingFieldImpl;
     use icicle_bn254::curve::ScalarField as Bn254ScalarField;
@@ -437,7 +438,8 @@ mod log_derivative_tests {
             NTTDir::kInverse,
             &cfg,
             HostSlice::from_mut_slice(&mut f_coeffs),
-        );
+        )
+        .unwrap();
 
         let f = Bn254Poly::from_coeffs(HostSlice::from_slice(&f_coeffs), N);
         let f_cm = Kzg::commit(&pk, &f);

@@ -9,7 +9,7 @@ use icicle_runtime::memory::HostSlice;
 use icicle_core::polynomials::UnivariatePolynomial;
 use crate::utils::get_coeffs_of_poly;
 
-use std::ops::{Add, Mul, Sub};
+use icicle_core::traits::Arithmetic;
 
 use std::collections::BTreeMap;
 
@@ -140,9 +140,7 @@ where
     ) -> Affine<C1>
     where
         P: UnivariatePolynomial<Field = C1::ScalarField>,
-        for<'a> &'a P: std::ops::Add<&'a P, Output = P>,
-        C1::ScalarField: Mul<Output = C1::ScalarField>,
-        C1::ScalarField: Sub<Output = C1::ScalarField>,
+        <C1 as Curve>::ScalarField: Arithmetic,
     {
         let powers_of_gamma = std::iter::successors(Some(separation_challenge), |p| {
             Some(*p * separation_challenge)
@@ -151,7 +149,7 @@ where
         let mut batched = polys[0].clone();
         for (p_i, gamma_pow_i) in polys.iter().skip(1).zip(powers_of_gamma) {
             let gamma_poly = p_i.mul_by_scalar(&gamma_pow_i);
-            batched = &gamma_poly + &batched;
+            batched = gamma_poly.add(&batched); //&gamma_poly + &batched;
         }
         
         let coeffs = [C1::ScalarField::zero() - opening_challenge, C1::ScalarField::one()];
@@ -179,9 +177,7 @@ where
         vk: &VK<C1, C2, F>,
     ) -> Result<(), Error>
     where
-        C1::ScalarField: Mul<Output = C1::ScalarField>,
-        C1::ScalarField: Add<Output = C1::ScalarField>,
-        C1::ScalarField: Sub<Output = C1::ScalarField>,
+        <C1 as Curve>::ScalarField: Arithmetic,
     {
         assert_eq!(commitments.len(), evaluations.len());
         let powers_of_gamma: Vec<_> = std::iter::successors(Some(C1::ScalarField::one()), |p| {
@@ -191,6 +187,7 @@ where
         .collect();
         
         let mut cfg = MSMConfig::default();
+        cfg.is_async = false;
         let mut batched_commitment = vec![Projective::<C1>::zero(); 1];
         msm::msm(
             HostSlice::from_slice(&powers_of_gamma),

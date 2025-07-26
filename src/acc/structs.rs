@@ -9,7 +9,6 @@ use icicle_core::traits::FieldImpl;
 use ark_serialize::Validate;
 use ark_serialize::Compress;
 
-use icicle_core::ntt::NTTDomain;
 #[derive(Debug)]
 pub enum Error {
     OpeningFailed,

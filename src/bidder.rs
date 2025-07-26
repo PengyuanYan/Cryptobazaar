@@ -4,7 +4,6 @@ use icicle_core::traits::FieldImpl;
 use icicle_core::polynomials::UnivariatePolynomial;
 use icicle_core::ntt::{NTT};
 use icicle_core::traits::Arithmetic;
-use std::ops::{Add, Mul};
 use rand::{RngCore, SeedableRng};
 
 use crate::{
@@ -40,12 +39,11 @@ where
     F: FieldImpl,
     C1: Pairing<C1, C2, F>,
     U: UnivariatePolynomial<Field = C1::ScalarField>,
-    for<'a> &'a U: Add<&'a U, Output = U>
 {
     pub fn new(pk: KzgPk<C1, C2, F>) -> Self 
     where
         <<C1 as Curve>::ScalarField as FieldImpl>::Config: NTT<<C1 as Curve>::ScalarField, <C1 as Curve>::ScalarField>,
-        <C1 as Curve>::ScalarField: Arithmetic
+        <C1 as Curve>::ScalarField: Arithmetic,
     {
         let gp_index = GatesArgument::<N, P, C1, C2, F>::prover_index();
         let gv_index = GatesArgument::<N, P, C1, C2, F>::verifier_index::<U>(&pk);
@@ -67,7 +65,7 @@ where
     ) -> GatesProof<C1> 
     where
         <<C1 as Curve>::ScalarField as FieldImpl>::Config: NTT<<C1 as Curve>::ScalarField, <C1 as Curve>::ScalarField>,
-        <C1 as Curve>::ScalarField: Arithmetic
+        <C1 as Curve>::ScalarField: Arithmetic,
     {
         let bid_encoder = self.bid_encoder.as_ref().unwrap();
         let witness: GatesWitness<C1, U> = bid_encoder.to_gate_witness::<R, U>(seed);
@@ -81,7 +79,7 @@ where
 
     pub fn second_round(&self, basis: &[Affine::<C1>]) -> Vec<Affine::<C1>>
     where 
-        <C1 as Curve>::ScalarField: Add<Output = <C1 as Curve>::ScalarField> + Mul<Output = <C1 as Curve>::ScalarField>
+        <C1 as Curve>::ScalarField: Arithmetic,
     {
         let bid_encoder = self.bid_encoder.as_ref().unwrap();
         bid_encoder.to_second_av_round(&basis)

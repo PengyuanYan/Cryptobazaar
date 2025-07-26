@@ -4,8 +4,6 @@ use icicle_core::polynomials::UnivariatePolynomial;
 use icicle_core::curve::Curve;
 use icicle_core::ntt::{NTTDomain, get_root_of_unity};
 use icicle_core::traits::Arithmetic;
-use std::ops::{Mul, Sub, Add};
-use std::slice::IterMut;
 
 pub mod folding;
 pub mod srs;
@@ -59,9 +57,6 @@ where
 pub fn evaluate_all_lagrange_coefficients<C: Curve>(domain: C::ScalarField, tau: C::ScalarField, n: usize) -> Vec<C::ScalarField>
 where
     <C as Curve>::ScalarField: Arithmetic,
-    C::ScalarField: Mul<Output = C::ScalarField>,
-    C::ScalarField: Sub<Output = C::ScalarField>,
-    C::ScalarField: Add<Output = C::ScalarField>
 {
     let size = n;
     let z_h_at_tau = tau.pow(n) - C::ScalarField::one();
