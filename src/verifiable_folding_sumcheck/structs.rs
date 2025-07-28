@@ -1,8 +1,6 @@
 use icicle_core::traits::FieldImpl;
-use icicle_core::ntt::NTTDomain;
 use icicle_core::curve::{Curve,Affine};
 use icicle_core::polynomials::UnivariatePolynomial;
-use std::marker::PhantomData;
 
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use ark_std::io::{Read, Write};
@@ -96,7 +94,7 @@ impl<C: Curve> CanonicalDeserialize for Instance<C> {
         let n_usize = usize::try_from(n_u64)
             .map_err(|_| SerializationError::InvalidData)?;
         
-        let mut read_affine = |reader: &mut dyn Read| -> Result<Affine::<C>, std::io::Error> {
+        let read_affine = |reader: &mut dyn Read| -> Result<Affine::<C>, std::io::Error> {
             let mut x_bytes = vec![0u8; base_len];
             let mut y_bytes = vec![0u8; base_len];
             reader.read_exact(&mut x_bytes)?;
@@ -119,7 +117,7 @@ impl<C: Curve> CanonicalDeserialize for Instance<C> {
 
         let mut challenges = Vec::with_capacity(len_usize);
 
-        for i in 0..len_usize {
+        for _ in 0..len_usize {
             let mut challenge_buf = vec![0u8; scalar_len];
             reader.read_exact(&mut challenge_buf)?;
             let challenge = C::ScalarField::from_bytes_le(&challenge_buf);
@@ -238,7 +236,7 @@ impl<C: Curve> CanonicalDeserialize for Proof<C> {
         let scalar_len = C::ScalarField::zero().to_bytes_le().len();
         let base_len = C::BaseField::zero().to_bytes_le().len();
         
-        let mut read_affine = |reader: &mut dyn Read| -> Result<Affine::<C>, std::io::Error> {
+        let read_affine = |reader: &mut dyn Read| -> Result<Affine::<C>, std::io::Error> {
             let mut x_bytes = vec![0u8; base_len];
             let mut y_bytes = vec![0u8; base_len];
             reader.read_exact(&mut x_bytes)?;
@@ -298,30 +296,17 @@ impl<C: Curve> CanonicalDeserialize for Proof<C> {
 
 #[cfg(test)]
 mod serialize_test {
-    use std::ops::Mul;
-    use icicle_bn254::curve::{CurveCfg as Bn254CurveCfg, G2CurveCfg as Bn254G2CurveCfg};
-    use icicle_bn254::pairing::PairingTargetField as Bn254PairingFieldImpl;
+    use icicle_bn254::curve::CurveCfg as Bn254CurveCfg;
     use icicle_bn254::curve::ScalarField as Bn254ScalarField;
-    use icicle_core::curve::{Curve,Affine,Projective};
+    use icicle_core::curve::Affine;
     use icicle_core::traits::FieldImpl;
-    use rand_chacha::ChaCha20Rng;
-    use std::marker::PhantomData;
-    use icicle_core::polynomials::UnivariatePolynomial;
-    use icicle_bn254::polynomials::DensePolynomial as Bn254Poly;
     
     use ark_serialize::{CanonicalSerialize, CanonicalDeserialize, Compress};
     use ark_serialize::Validate;
 
-    use crate::bid_encoder::BidEncoder;
-    use crate::{
-        kzg::{PK, VK},
-        utils::srs::unsafe_setup_from_tau,
-    };
-
     use super::{Instance, Proof};
 
     #[test]
-    #[ignore]
     fn test_serialize() {
         let n = 7usize;
         let p_base = Affine::<Bn254CurveCfg>::zero();
@@ -336,7 +321,7 @@ mod serialize_test {
                                 };
         
         let mut data = Vec::new();
-        instance.serialize_with_mode(&mut data, Compress::No);
+        instance.serialize_with_mode(&mut data, Compress::No).unwrap();
 
         let mut reader: &[u8] = &data;
         let result = Instance::<Bn254CurveCfg>::deserialize_with_mode(&mut reader, Compress::No, Validate::No).unwrap();
@@ -369,7 +354,7 @@ mod serialize_test {
                            };
         
         let mut data = Vec::new();
-        proof.serialize_with_mode(&mut data, Compress::No);
+        proof.serialize_with_mode(&mut data, Compress::No).unwrap();
 
         let mut reader: &[u8] = &data;
         let result = Proof::<Bn254CurveCfg>::deserialize_with_mode(&mut reader, Compress::No, Validate::No).unwrap();

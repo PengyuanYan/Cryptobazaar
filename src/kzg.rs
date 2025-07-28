@@ -25,7 +25,7 @@ where
     F: FieldImpl,
     C1: Pairing<C1, C2, F>,
 {
-    pub _e: PhantomData<(C1, C2, F)>,
+    pub e: PhantomData<(C1, C2, F)>,
 }
 
 pub struct PK<C1, C2, F>
@@ -36,7 +36,7 @@ where
     C1: Pairing<C1, C2, F>,
 {
     pub srs: Vec<Affine<C1>>,
-    pub _e: PhantomData<(C2, F)>,
+    pub e: PhantomData<(C2, F)>,
 }
 
 pub struct VK<C1, C2, F>
@@ -60,7 +60,7 @@ where
 {
     pub pk_max_degree: usize,
     pub shifts: BTreeMap<usize, Affine::<C2>>,
-    pub _e: PhantomData<(C1, F)>,
+    pub e: PhantomData<(C1, F)>,
 }
 
 impl<C1, C2, F> DegreeCheckVK<C1, C2, F>
@@ -115,7 +115,7 @@ where
             );
         }
 
-        let mut cfg = MSMConfig::default();
+        let cfg = MSMConfig::default();
         let mut projective_output = vec![Projective::<C1>::zero(); 1];
         let coeffs = get_coeffs_of_poly(poly);
 
@@ -145,11 +145,12 @@ where
         let powers_of_gamma = std::iter::successors(Some(separation_challenge), |p| {
             Some(*p * separation_challenge)
         });
-
+        
+        //these poly related functions dont need ntt
         let mut batched = polys[0].clone();
         for (p_i, gamma_pow_i) in polys.iter().skip(1).zip(powers_of_gamma) {
             let gamma_poly = p_i.mul_by_scalar(&gamma_pow_i);
-            batched = gamma_poly.add(&batched); //&gamma_poly + &batched;
+            batched = gamma_poly.add(&batched);
         }
         
         let coeffs = [C1::ScalarField::zero() - opening_challenge, C1::ScalarField::one()];
@@ -186,8 +187,7 @@ where
         .take(commitments.len())
         .collect();
         
-        let mut cfg = MSMConfig::default();
-        cfg.is_async = false;
+        let cfg = MSMConfig::default();
         let mut batched_commitment = vec![Projective::<C1>::zero(); 1];
         msm::msm(
             HostSlice::from_slice(&powers_of_gamma),
@@ -208,7 +208,6 @@ where
             p(X) - y = q(X)•X - q(X)z
             p(X) - y + q(X)z = q(X)•X
             e([p] + z[q] - y[1], [1]) = e([q], [x])
-            e([p] + z[q] - y[1], [1])*e([q], -[x]) = 0
         */
         
         let opening = opening_proof.to_projective() * opening_challenge;
@@ -238,7 +237,7 @@ mod test_kzg {
     use icicle_core::polynomials::UnivariatePolynomial;
     use icicle_runtime::memory::HostSlice;
     
-    use icicle_bn254::curve::{CurveCfg as Bn254CurveCfg, G2CurveCfg as Bn254G2CurveCfg, G1Projective, G1Affine, G2Projective};
+    use icicle_bn254::curve::{CurveCfg as Bn254CurveCfg, G2CurveCfg as Bn254G2CurveCfg, G1Projective, G1Affine};
     use icicle_bn254::pairing::PairingTargetField as Bn254PairingFieldImpl;
     use icicle_core::curve::{Curve,Affine,Projective};
 
@@ -265,10 +264,7 @@ mod test_kzg {
         let tau = Bn254ScalarField::from_u32(100u32);
         let srs = unsafe_setup_from_tau::<Bn254CurveCfg>(size - 1, tau);
         
-        let pk = PK::<Bn254CurveCfg, Bn254G2CurveCfg, Bn254PairingFieldImpl> { srs: srs.clone(), _e: PhantomData, };
-
-        let mut cfg = MSMConfig::default();
-        let mut output = vec![G1Projective::zero(); size];
+        let pk = PK::<Bn254CurveCfg, Bn254G2CurveCfg, Bn254PairingFieldImpl> { srs: srs.clone(), e: PhantomData, };
         
         let commit = Kzg::commit(&pk, &poly);
 
@@ -303,10 +299,7 @@ mod test_kzg {
         let x_g2 = Bn254G2CurveCfg::get_generator() * tau;
         let vk = VK::<Bn254CurveCfg, Bn254G2CurveCfg, Bn254PairingFieldImpl>::new(x_g2.into());
         
-        let pk = PK::<Bn254CurveCfg, Bn254G2CurveCfg, Bn254PairingFieldImpl> { srs: srs.clone(), _e: PhantomData, };
-
-        let mut cfg = MSMConfig::default();
-        let mut output = vec![G1Projective::zero(); size];
+        let pk = PK::<Bn254CurveCfg, Bn254G2CurveCfg, Bn254PairingFieldImpl> { srs: srs.clone(), e: PhantomData, };
         
         let a_commit = Kzg::commit(&pk, &a_poly);
         let b_commit = Kzg::commit(&pk, &b_poly);
@@ -349,7 +342,7 @@ mod test_kzg {
             srs.push(affine_base);
         }
         
-        let mut cfg = MSMConfig::default();
+        let cfg = MSMConfig::default();
         let mut output = vec![G1Projective::zero(); size];
         
         msm::msm(
@@ -362,7 +355,7 @@ mod test_kzg {
 
         let w = Bn254ScalarField::from_u32(10u32);
 
-        let eval = poly.eval(&w);
+        let _eval = poly.eval(&w);
     }
 
     #[test]
@@ -376,7 +369,7 @@ mod test_kzg {
 
         let shift_factor = srs.len() - 1 - (n - 1);
 
-        let tau_pow_shift = Bn254G2CurveCfg::mul_scalar(Bn254G2CurveCfg::get_generator(), (tau.pow(shift_factor)));
+        let tau_pow_shift = Bn254G2CurveCfg::mul_scalar(Bn254G2CurveCfg::get_generator(), tau.pow(shift_factor));
         let mut degree_check_vk_map: BTreeMap<usize, Projective<Bn254G2CurveCfg>> = BTreeMap::new();
         degree_check_vk_map.insert(shift_factor, tau_pow_shift);
 
@@ -388,7 +381,7 @@ mod test_kzg {
             Bn254DensePolynomial::from_coeffs(HostSlice::from_slice(&shifted_coeffs), shifted_coeffs.len())
         };
 
-        let pk = PK::<Bn254CurveCfg, Bn254G2CurveCfg, Bn254PairingFieldImpl> { srs: srs.clone(), _e: PhantomData, };
+        let pk = PK::<Bn254CurveCfg, Bn254G2CurveCfg, Bn254PairingFieldImpl> { srs: srs.clone(), e: PhantomData, };
         let a_cm = Kzg::commit(&pk, &a_poly);
         let a_degree_cm = Kzg::commit(&pk, &a_degree);
         

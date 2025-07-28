@@ -1,5 +1,4 @@
 use icicle_core::traits::FieldImpl;
-use icicle_core::ntt::NTTDomain;
 use icicle_core::curve::{Curve,Affine};
 use icicle_core::polynomials::UnivariatePolynomial;
 use std::marker::PhantomData;
@@ -215,7 +214,7 @@ impl<C: Curve> CanonicalDeserialize for Proof<C> {
         let scalar_len = C::ScalarField::zero().to_bytes_le().len();
         let base_len = C::BaseField::zero().to_bytes_le().len();
 
-        let mut read_affine = |reader: &mut dyn Read| -> Result<Affine::<C>, std::io::Error> {
+        let read_affine = |reader: &mut dyn Read| -> Result<Affine::<C>, std::io::Error> {
             let mut x_bytes = vec![0u8; base_len];
             let mut y_bytes = vec![0u8; base_len];
             reader.read_exact(&mut x_bytes)?;

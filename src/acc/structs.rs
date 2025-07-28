@@ -94,7 +94,7 @@ where
     P: UnivariatePolynomial<Field = C::ScalarField>,
 {
     pub acc: P,
-    pub _e: PhantomData<C>,
+    pub e: PhantomData<C>,
 }
 
 pub struct Proof<C: Curve> {

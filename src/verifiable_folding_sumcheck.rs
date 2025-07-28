@@ -8,7 +8,6 @@ use crate::utils::get_coeffs_of_poly;
 use icicle_core::ntt::{ntt, NTTDomain, NTTInitDomainConfig, NTTConfig, NTTDir, get_root_of_unity, initialize_domain, NTT, release_domain};
 use icicle_core::traits::GenerateRandom;
 use icicle_core::traits::Arithmetic;
-use std::ops::{Mul, Add};
 
 pub mod structs;
 mod tr;
@@ -91,7 +90,7 @@ where
 
         let b_evals = compute_folding_coeffs::<C1>(&instance.challenges);
 
-        let mut cfg = NTTConfig::<C1::ScalarField>::default();
+        let cfg = NTTConfig::<C1::ScalarField>::default();
         initialize_domain(domain, &NTTInitDomainConfig::default()).unwrap();
         let mut b_coeffs = vec![C1::ScalarField::zero(); b_evals.len()];
         ntt(
@@ -101,7 +100,9 @@ where
             HostSlice::from_mut_slice(&mut b_coeffs),
         )
         .unwrap();
-        release_domain::<C1::ScalarField>();
+
+        release_domain::<C1::ScalarField>().unwrap();
+
         let b = U::from_coeffs(HostSlice::from_slice(&b_coeffs), b_coeffs.len());
         
         // B(X) + ca(X)b(X)
@@ -118,10 +119,11 @@ where
         
         let len = instance.n + 1;
         let mut vanishing_poly_coeffs = Vec::with_capacity(len);
-        release_domain::<C1::ScalarField>();
+
+        release_domain::<C1::ScalarField>().unwrap();
 
         vanishing_poly_coeffs.push(C1::ScalarField::zero() - C1::ScalarField::one());
-        for i in 0..(len - 2) {
+        for _ in 0..(len - 2) {
             vanishing_poly_coeffs.push(C1::ScalarField::zero());
         }
         vanishing_poly_coeffs.push(C1::ScalarField::one());
@@ -134,7 +136,7 @@ where
         let (q, r) = lhs.divide(&domain_vanishing_poly);
 
         let mut r_coeffs = get_coeffs_of_poly(&r);
-
+        
         while r_coeffs.len() > 1 && r_coeffs.last() == Some(&C1::ScalarField::zero()) {
             r_coeffs.pop();
         }
@@ -154,20 +156,22 @@ where
             }
             U::from_coeffs(HostSlice::from_slice(&shifted_coeffs), shifted_coeffs.len())
         };
-
+        
         let r_mod_x_cm = Kzg::commit(pk, &r_mod_x);
         let r_degree_cm = Kzg::commit(pk, &r_degree);
         let q_cm = Kzg::commit(pk, &q);
-
+        
         tr.second_round(&z_1, &z_2, &r_mod_x_cm, &r_degree_cm, &q_cm);
         let opening_challenge = tr.get_opening_challenge();
-
+        
+        //these neet ntt domain
         let a_opening = witness.a.eval(&opening_challenge);
         let blinder_opening = blinder.eval(&opening_challenge);
 
         let r_opening = r_mod_x.eval(&opening_challenge);
         let q_opening = q.eval(&opening_challenge);
-        release_domain::<C1::ScalarField>();
+
+        release_domain::<C1::ScalarField>().unwrap();
         
         tr.send_openings(&a_opening, &blinder_opening, &r_opening, &q_opening);
 
@@ -317,17 +321,17 @@ where
 
 #[cfg(test)]
 mod verifiable_folding_sumcheck_tests {
-    use std::{collections::BTreeMap, ops::Mul};
+    use std::collections::BTreeMap;
 
     use icicle_bn254::curve::{CurveCfg as Bn254CurveCfg, G2CurveCfg as Bn254G2CurveCfg};
     use icicle_bn254::pairing::PairingTargetField as Bn254PairingFieldImpl;
     use icicle_bn254::curve::ScalarField as Bn254ScalarField;
-    use icicle_core::curve::{Curve,Affine,Projective};
+    use icicle_core::curve::{Curve, Affine};
     use icicle_core::traits::FieldImpl;
     use std::marker::PhantomData;
     use icicle_core::polynomials::UnivariatePolynomial;
     use icicle_bn254::polynomials::DensePolynomial as Bn254Poly;
-    use icicle_core::ntt::{ntt, NTTDomain, NTTInitDomainConfig, NTTConfig, NTTDir, get_root_of_unity, initialize_domain, ntt_inplace, NTT, release_domain};
+    use icicle_core::ntt::{ntt, NTTInitDomainConfig, NTTConfig, NTTDir, get_root_of_unity, initialize_domain};
     use icicle_runtime::memory::HostSlice;
     use icicle_core::traits::Arithmetic;
     use icicle_bn254::curve::ScalarCfg;
@@ -370,16 +374,16 @@ mod verifiable_folding_sumcheck_tests {
         let degree_check_vk = DegreeCheckVK::<Bn254CurveCfg, Bn254G2CurveCfg, Bn254PairingFieldImpl> {
             pk_max_degree: srs.len() - 1,
             shifts: degree_check_vk_map,
-            _e: PhantomData,
+            e: PhantomData,
         };
 
-        let pk = PK::<Bn254CurveCfg, Bn254G2CurveCfg, Bn254PairingFieldImpl> { srs: srs.clone(), _e: PhantomData, };
+        let pk = PK::<Bn254CurveCfg, Bn254G2CurveCfg, Bn254PairingFieldImpl> { srs: srs.clone(), e: PhantomData, };
         let vk = VK::<Bn254CurveCfg, Bn254G2CurveCfg, Bn254PairingFieldImpl>::new(x_g2_affine);
 
         let a_coeffs = ScalarCfg::generate_random(n as usize);
         let a_poly = Bn254Poly::from_coeffs(HostSlice::from_slice(&a_coeffs), a_coeffs.len());
 
-        let mut cfg = NTTConfig::<Bn254ScalarField>::default();
+        let cfg = NTTConfig::<Bn254ScalarField>::default();
         initialize_domain(domain, &NTTInitDomainConfig::default()).unwrap();
         let mut a_evals = vec![Bn254ScalarField::zero(); n as usize];
 

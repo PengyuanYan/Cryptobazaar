@@ -1,4 +1,4 @@
-use icicle_core::curve::{Curve, Projective, Affine};
+use icicle_core::curve::{Curve, Affine};
 use std::marker::PhantomData;
 use icicle_core::traits::Arithmetic;
 use icicle_core::traits::FieldImpl;
@@ -128,13 +128,10 @@ impl<C: Curve> Argument<C> {
 
 #[cfg(test)]
 mod pedersen_schnorr_test {
-    use icicle_bn254::curve::{CurveCfg as Bn254CurveCfg, G2CurveCfg as Bn254G2CurveCfg};
-    use icicle_bn254::pairing::PairingTargetField as Bn254PairingFieldImpl;
+    use icicle_bn254::curve::CurveCfg as Bn254CurveCfg;
     use icicle_bn254::curve::ScalarField as Bn254ScalarField;
-    use icicle_core::curve::{Curve,Affine,Projective};
+    use icicle_core::curve::Curve;
     use icicle_core::traits::FieldImpl;
-    use icicle_runtime::memory::HostSlice;
-    use icicle_core::traits::GenerateRandom;
 
     use super::{
         structs::{Instance, Witness},

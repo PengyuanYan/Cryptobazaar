@@ -24,7 +24,7 @@ impl<C: Curve> Transcript<C> {
     }
 
     pub(crate) fn send_q(&mut self, q: &C::ScalarField) {
-        let mut data = q.to_bytes_le();
+        let data = q.to_bytes_le();
         self.tr.send_message(b"q", &data);
     }
 

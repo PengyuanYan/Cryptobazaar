@@ -105,9 +105,8 @@ impl<const N: usize, const B: usize, C: Curve + icicle_core::msm::MSM<C>> Auctio
 
 #[cfg(test)]
 mod auctioneer_tests {
-    use icicle_bn254::curve::{CurveCfg as Bn254CurveCfg, G2CurveCfg as Bn254G2CurveCfg};
-    use icicle_bn254::pairing::PairingTargetField as Bn254PairingFieldImpl;
-    use icicle_core::curve::{Curve,Affine,Projective};
+    use icicle_bn254::curve::CurveCfg as Bn254CurveCfg;
+    use icicle_core::curve::{Curve,Affine};
     use icicle_core::traits::FieldImpl;
     use icicle_core::traits::GenerateRandom;
     use std::ops::Mul;

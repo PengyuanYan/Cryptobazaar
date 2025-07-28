@@ -1,7 +1,7 @@
 use crate::gates::structs::Witness;
 use rand::{RngCore, SeedableRng};
 use icicle_core::polynomials::UnivariatePolynomial;
-use icicle_core::ntt::{ntt, NTTDomain, NTTInitDomainConfig, NTTConfig, NTTDir, get_root_of_unity, initialize_domain, ntt_inplace, NTT};
+use icicle_core::ntt::{ntt, NTTDomain, NTTInitDomainConfig, NTTConfig, NTTDir, get_root_of_unity, initialize_domain, ntt_inplace, NTT, release_domain};
 use icicle_core::curve::{Curve, Affine};
 use icicle_runtime::memory::HostSlice;
 use icicle_core::traits::FieldImpl;
@@ -148,6 +148,8 @@ impl<const P: usize, const N: usize, C: Curve> BidEncoder<P, N, C> {
         )
         .unwrap();
 
+        release_domain::<C::ScalarField>().unwrap();
+
         let diff = UnivariatePolynomial::from_coeffs(HostSlice::from_slice(&diff_ntt_evals), diff_ntt_evals.len());
         let g = UnivariatePolynomial::from_coeffs(HostSlice::from_slice(&g_ntt_evals), g_ntt_evals.len());
 
@@ -215,9 +217,8 @@ impl<const P: usize, const N: usize, C: Curve> BidEncoder<P, N, C> {
 
 #[cfg(test)]
 mod encoder_tests {
-    use icicle_bn254::curve::{CurveCfg as Bn254CurveCfg, G2CurveCfg as Bn254G2CurveCfg};
+    use icicle_bn254::curve::CurveCfg as Bn254CurveCfg;
     use icicle_bn254::curve::ScalarField as Bn254ScalarField;
-    use icicle_core::curve::{Curve,Affine,Projective};
     use icicle_core::traits::FieldImpl;
 
     use rand_chacha::ChaCha20Rng;

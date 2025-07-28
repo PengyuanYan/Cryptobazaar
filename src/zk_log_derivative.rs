@@ -19,11 +19,11 @@
         2. b(µ)(ß * s(µ) + f(µ)) - 1 = q(µ)zH(µ)
         3. b(0) = (R(ß) + ¥)/N
 */
-use icicle_core::curve::{Curve,Affine,Projective};
+use icicle_core::curve::Curve;
 use icicle_core::pairing::Pairing;
 use icicle_core::traits::FieldImpl;
 use icicle_core::polynomials::UnivariatePolynomial;
-use icicle_core::ntt::{ntt, NTTDomain, NTTInitDomainConfig, NTTConfig, NTTDir, get_root_of_unity, initialize_domain, ntt_inplace, NTT, release_domain};
+use icicle_core::ntt::{ntt, NTTDomain, NTTInitDomainConfig, NTTConfig, NTTDir, get_root_of_unity, initialize_domain, NTT, release_domain};
 use icicle_runtime::memory::HostSlice;
 use icicle_core::traits::Arithmetic;
 use crate::kzg::{Kzg, PK as KzgPk, VK as KzgVk};
@@ -68,7 +68,7 @@ where
 
         s_evals.append(&mut zeros);
          
-        let mut cfg = NTTConfig::<C1::ScalarField>::default();
+        let cfg = NTTConfig::<C1::ScalarField>::default();
         initialize_domain(domain, &NTTInitDomainConfig::default()).unwrap();
         let mut coeffs = vec![C1::ScalarField::zero(); N];
         ntt(
@@ -78,6 +78,8 @@ where
             HostSlice::from_mut_slice(&mut coeffs),
         )
         .unwrap();
+
+        release_domain::<C1::ScalarField>().unwrap();
 
         let s = U::from_coeffs(HostSlice::from_slice(&coeffs), N);
         let s_cm = Kzg::commit(pk, &s);
@@ -105,7 +107,7 @@ where
 
         s_evals.append(&mut zeros);
         
-        let mut cfg = NTTConfig::<C1::ScalarField>::default();
+        let cfg = NTTConfig::<C1::ScalarField>::default();
         initialize_domain(domain, &NTTInitDomainConfig::default()).unwrap();
         let mut s_coeffs = vec![C1::ScalarField::zero(); N];
         ntt(
@@ -115,7 +117,7 @@ where
             HostSlice::from_mut_slice(&mut s_coeffs),
         )
         .unwrap();
-        
+
         let s_coeffs_clone = s_coeffs.clone();
 
         for i in 0..s_coeffs.len() {
@@ -132,6 +134,8 @@ where
         )
         .unwrap();
         
+        release_domain::<C1::ScalarField>().unwrap();
+
         ProverIndex {
             s: U::from_coeffs(HostSlice::from_slice(&s_coeffs_clone), N),
             s_coset_evals: s_coset_evals,
@@ -161,7 +165,7 @@ where
         
         let mut f_coeffs = get_coeffs_of_poly(&witness.f);
 
-        let mut cfg = NTTConfig::<C1::ScalarField>::default();
+        let cfg = NTTConfig::<C1::ScalarField>::default();
         initialize_domain(domain, &NTTInitDomainConfig::default()).unwrap();
         let mut f_evals = vec![C1::ScalarField::zero(); N];
         ntt(
@@ -276,7 +280,6 @@ where
 
         tr.send_openings(&f_opening, &s_opening, &b_opening, &q_opening);
         let separation_challenge = tr.get_separation_challenge();
-        
 
         let coeffs = [C1::ScalarField::zero(), C1::ScalarField::one()];
         let divisor_poly = U::from_coeffs(HostSlice::from_slice(&coeffs), 2);
@@ -290,6 +293,8 @@ where
             mu,
             separation_challenge,
         );
+        
+        release_domain::<C1::ScalarField>().unwrap();
 
         Proof {
             gamma,
@@ -316,7 +321,6 @@ where
         <C1 as Curve>::ScalarField: Arithmetic,
         <<C1 as Curve>::ScalarField as FieldImpl>::Config: NTTDomain<<C1 as Curve>::ScalarField>
     {
-        let domain = get_root_of_unity::<C1::ScalarField>(N.try_into().unwrap());
         let mut tr = Transcript::new(b"log-derivative");
         tr.send_v_index(index);
         tr.send_instance(instance);
@@ -386,12 +390,12 @@ mod log_derivative_tests {
     use icicle_bn254::curve::{CurveCfg as Bn254CurveCfg, G2CurveCfg as Bn254G2CurveCfg};
     use icicle_bn254::pairing::PairingTargetField as Bn254PairingFieldImpl;
     use icicle_bn254::curve::ScalarField as Bn254ScalarField;
-    use icicle_core::curve::{Curve,Affine,Projective};
+    use icicle_core::curve::Curve;
     use icicle_core::traits::FieldImpl;
     use std::marker::PhantomData;
     use icicle_core::polynomials::UnivariatePolynomial;
     use icicle_bn254::polynomials::DensePolynomial as Bn254Poly;
-    use icicle_core::ntt::{ntt, NTTDomain, NTTInitDomainConfig, NTTConfig, NTTDir, get_root_of_unity, initialize_domain, ntt_inplace, NTT, release_domain};
+    use icicle_core::ntt::{ntt, NTTInitDomainConfig, NTTConfig, NTTDir, get_root_of_unity, initialize_domain, release_domain};
     use icicle_runtime::memory::HostSlice;
     use icicle_core::traits::Arithmetic;
 
@@ -416,7 +420,7 @@ mod log_derivative_tests {
         let srs = unsafe_setup_from_tau::<Bn254CurveCfg>(N - 1, tau);
         let x_g2 = Bn254G2CurveCfg::get_generator() * tau;
 
-        let pk = PK::<Bn254CurveCfg, Bn254G2CurveCfg, Bn254PairingFieldImpl> { srs: srs.clone(), _e: PhantomData,};
+        let pk = PK::<Bn254CurveCfg, Bn254G2CurveCfg, Bn254PairingFieldImpl> { srs: srs.clone(), e: PhantomData,};
         let vk = VK::<Bn254CurveCfg, Bn254G2CurveCfg, Bn254PairingFieldImpl>::new(x_g2.into());
 
         let index_v = Argument::<N, B, Bn254CurveCfg, Bn254G2CurveCfg, Bn254PairingFieldImpl, Bn254Poly>::index_v(&pk);
@@ -427,10 +431,10 @@ mod log_derivative_tests {
         f_evals[3] = Bn254ScalarField::one();
 
         let mut blinders: Vec<_> = (0..B).map(|i| Bn254ScalarField::from_u32((i + 10) as u32)).collect();
-        let mut blinders_cloned = blinders.clone();
+        let blinders_cloned = blinders.clone();
         f_evals.append(&mut blinders);
         
-        let mut cfg = NTTConfig::<Bn254ScalarField>::default();
+        let cfg = NTTConfig::<Bn254ScalarField>::default();
         initialize_domain(domain, &NTTInitDomainConfig::default()).unwrap();
         let mut f_coeffs = vec![Bn254ScalarField::zero(); N];
         ntt(
@@ -440,6 +444,8 @@ mod log_derivative_tests {
             HostSlice::from_mut_slice(&mut f_coeffs),
         )
         .unwrap();
+
+        release_domain::<Bn254ScalarField>().unwrap();
 
         let f = Bn254Poly::from_coeffs(HostSlice::from_slice(&f_coeffs), N);
         let f_cm = Kzg::commit(&pk, &f);

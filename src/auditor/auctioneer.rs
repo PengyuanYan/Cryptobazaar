@@ -11,7 +11,6 @@ pub struct AVAuditor<const B: usize, C: Curve + icicle_core::msm::MSM<C>> {
     pub(crate) second_round_output: Affine::<C>,
 }
 
-// TODO: make corresponding error
 impl<const B: usize, C: Curve + icicle_core::msm::MSM<C>> AVAuditor<B, C> {
     pub fn audit(&self) -> bool 
     where
@@ -22,7 +21,7 @@ impl<const B: usize, C: Curve + icicle_core::msm::MSM<C>> AVAuditor<B, C> {
 
         let mut outputs = vec![Affine::<C>::zero(); B];
 
-        let mut cfg = MSMConfig::default();
+        let cfg = MSMConfig::default();
         let mut projective_output = vec![Projective::<C>::zero(); 1];
         
         msm::msm(
@@ -55,7 +54,7 @@ impl<const B: usize, C: Curve + icicle_core::msm::MSM<C>> AVAuditor<B, C> {
 
         let ones = vec![C::ScalarField::one(); B];
         
-        let mut cfg = MSMConfig::default();
+        let cfg = MSMConfig::default();
         let mut projective_output = vec![Projective::<C>::zero(); 1];
         
         msm::msm(
@@ -80,7 +79,6 @@ pub struct AuctioneerAuditor<const N: usize, const B: usize, C: Curve  + icicle_
     av_auditor: [AVAuditor<B, C>; N],
 }
 
-// TODO: wrap in error
 impl<const N: usize, const B: usize, C: Curve + icicle_core::msm::MSM<C>> AuctioneerAuditor<N, B, C> {
     pub fn audit(&self) -> bool where C: Curve<ScalarField: Arithmetic> {
         for i in 0..N {

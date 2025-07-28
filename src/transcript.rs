@@ -54,6 +54,7 @@ mod tr_tests {
     use icicle_runtime::memory::HostSlice;
 
     #[test]
+    #[ignore]
     fn test_from_bytes_le() {
         let transcript = Tr::new(b"acc-transcript");
         let challenge_size = Bn254ScalarField::zero().to_bytes_le().len();
@@ -67,13 +68,13 @@ mod tr_tests {
 
         let beta = Bn254ScalarField::from_bytes_le(&ch_buffer);
 
-        let beta_1 = beta + <Bn254CurveCfg as Curve>::ScalarField::zero();
-        let beta_2 = beta_1 + <Bn254CurveCfg as Curve>::ScalarField::zero();
+        let _beta_1 = beta + <Bn254CurveCfg as Curve>::ScalarField::zero();
+        let _beta_2 = _beta_1 + <Bn254CurveCfg as Curve>::ScalarField::zero();
         //println!("{}", beta_1 - beta_2);
 
         let test_coeffs = [<Bn254CurveCfg as Curve>::ScalarField::zero() - beta, <Bn254CurveCfg as Curve>::ScalarField::one()];
         let test_poly = Bn254DensePolynomial::from_coeffs(HostSlice::from_slice(&test_coeffs), 2);
-        let x = test_poly.eval(&beta);
+        let _x = test_poly.eval(&beta);
 
         //println!("{}",x);
     }

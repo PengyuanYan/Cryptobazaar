@@ -36,8 +36,6 @@ where
     modulus_zh_coset_evals
 }
 
-
-
 pub fn get_coeffs_of_poly<P>(poly: &P) -> Vec<P::Field>
 where
     P: UnivariatePolynomial,

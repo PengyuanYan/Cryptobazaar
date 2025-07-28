@@ -75,7 +75,7 @@ where
         
         let coeffs_1 = [C1::ScalarField::zero() - beta, C1::ScalarField::one()];
         let divisor_poly_1 = P::from_coeffs(HostSlice::from_slice(&coeffs_1), 2);
-        let (q_1, r_1) = witness.acc.divide(&divisor_poly_1);
+        let (q_1, _) = witness.acc.divide(&divisor_poly_1);
         let q_1 = Kzg::commit(&pk, &q_1);
 
         let coeffs_2 = [C1::ScalarField::zero() - (beta * omega), C1::ScalarField::one()];
@@ -186,18 +186,13 @@ mod acc_tests {
         NTTConfig, NTTDir, NTTInitDomainConfig, ntt, initialize_domain
     }};
 
-    use icicle_core::ntt::ntt_inplace;
     use icicle_core::traits::FieldImpl;
     use icicle_core::curve::Curve;
-    use icicle_core::ntt::NTTDomain;
-    use icicle_bn254::curve::ScalarCfg;
 
     use std::marker::PhantomData;
 
     use icicle_bn254::polynomials::DensePolynomial as Bn254DensePolynomial;
     use icicle_core::polynomials::UnivariatePolynomial;
-
-    use icicle_core::traits::Arithmetic;
     
     #[test]
     
@@ -208,11 +203,11 @@ mod acc_tests {
         let srs = unsafe_setup_from_tau::<Bn254CurveCfg>(n - 1, tau);
 
         let x_g2 = Bn254G2CurveCfg::get_generator() * tau;
-        let pk = PK::<Bn254CurveCfg, Bn254G2CurveCfg, Bn254PairingFieldImpl> { srs: srs.clone(), _e: PhantomData, };
+        let pk = PK::<Bn254CurveCfg, Bn254G2CurveCfg, Bn254PairingFieldImpl> { srs: srs.clone(), e: PhantomData, };
         let vk = VK::<Bn254CurveCfg, Bn254G2CurveCfg, Bn254PairingFieldImpl>::new(x_g2.into());
 
         let mu = Bn254ScalarField::from_u32(100);
-        let mut evals: Vec<Bn254ScalarField> = (0..n)
+        let evals: Vec<Bn254ScalarField> = (0..n)
             .scan(Bn254ScalarField::one(), |state, _| {
                 let out = *state;
                 *state = *state * mu;
@@ -220,7 +215,7 @@ mod acc_tests {
             })
             .collect();
 
-        let mut cfg = NTTConfig::<Bn254ScalarField>::default();
+        let cfg = NTTConfig::<Bn254ScalarField>::default();
         initialize_domain(rou, &NTTInitDomainConfig::default()).unwrap();
         let mut coeffs = vec![Bn254ScalarField::zero(); evals.len()];
         ntt(
@@ -236,7 +231,7 @@ mod acc_tests {
 
         let instance = Instance::<Bn254CurveCfg> { n, mu, acc_cm };
 
-        let witness  = Witness { acc: acc_poly, _e: PhantomData,};
+        let witness  = Witness { acc: acc_poly, e: PhantomData,};
         
         let proof  = Argument::prove(&instance, &witness, &pk);
         

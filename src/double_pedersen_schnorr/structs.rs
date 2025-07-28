@@ -1,6 +1,5 @@
 use icicle_core::traits::FieldImpl;
 use icicle_core::curve::{Curve,Affine};
-use std::marker::PhantomData;
 
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use ark_std::io::{Read, Write};
@@ -77,7 +76,7 @@ impl<C: Curve> CanonicalDeserialize for Instance<C> {
     ) -> Result<Self, SerializationError> {
         let base_len = C::BaseField::zero().to_bytes_le().len();
         
-        let mut read_affine = |reader: &mut dyn Read| -> Result<Affine::<C>, std::io::Error> {
+        let read_affine = |reader: &mut dyn Read| -> Result<Affine::<C>, std::io::Error> {
             let mut x_bytes = vec![0u8; base_len];
             let mut y_bytes = vec![0u8; base_len];
             reader.read_exact(&mut x_bytes)?;
@@ -170,7 +169,7 @@ impl<C: Curve> CanonicalDeserialize for Proof<C> {
         let scalar_len = C::ScalarField::zero().to_bytes_le().len();
         let base_len = C::BaseField::zero().to_bytes_le().len();
         
-        let mut read_affine = |reader: &mut dyn Read| -> Result<Affine::<C>, std::io::Error> {
+        let read_affine = |reader: &mut dyn Read| -> Result<Affine::<C>, std::io::Error> {
             let mut x_bytes = vec![0u8; base_len];
             let mut y_bytes = vec![0u8; base_len];
             reader.read_exact(&mut x_bytes)?;
@@ -208,14 +207,10 @@ impl<C: Curve> CanonicalDeserialize for Proof<C> {
 
 #[cfg(test)]
 mod serialize_test {
-    use std::ops::Mul;
-    use icicle_bn254::curve::{CurveCfg as Bn254CurveCfg, G2CurveCfg as Bn254G2CurveCfg};
-    use icicle_bn254::pairing::PairingTargetField as Bn254PairingFieldImpl;
+    use icicle_bn254::curve::CurveCfg as Bn254CurveCfg;
     use icicle_bn254::curve::ScalarField as Bn254ScalarField;
-    use icicle_core::curve::{Curve,Affine,Projective};
+    use icicle_core::curve::Affine;
     use icicle_core::traits::FieldImpl;
-    use icicle_core::polynomials::UnivariatePolynomial;
-    use icicle_bn254::polynomials::DensePolynomial as Bn254Poly;
     
     use ark_serialize::{CanonicalSerialize, CanonicalDeserialize, Compress};
     use ark_serialize::Validate;
@@ -235,7 +230,7 @@ mod serialize_test {
                                 };
         
         let mut data = Vec::new();
-        instance.serialize_with_mode(&mut data, Compress::No);
+        instance.serialize_with_mode(&mut data, Compress::No).unwrap();
 
         let mut reader: &[u8] = &data;
         let result = Instance::<Bn254CurveCfg>::deserialize_with_mode(&mut reader, Compress::No, Validate::No).unwrap();

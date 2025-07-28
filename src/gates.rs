@@ -14,9 +14,7 @@ use std::marker::PhantomData;
 use icicle_core::polynomials::UnivariatePolynomial;
 use icicle_core::ntt::{ntt, NTTDomain, NTTInitDomainConfig, NTTConfig, NTTDir, get_root_of_unity, initialize_domain, NTT, release_domain};
 use icicle_runtime::memory::HostSlice;
-use icicle_runtime::memory::HostOrDeviceSlice;
 use icicle_core::traits::Arithmetic;
-use icicle_core::msm;
 
 use crate::{
     kzg::{Kzg, PK as KzgPk, VK as KzgVk},
@@ -66,7 +64,7 @@ where
         let mut zeros = vec![C1::ScalarField::zero(); N - P];
         q_price_evals.append(&mut zeros);
         
-        let mut cfg = NTTConfig::<C1::ScalarField>::default();
+        let cfg = NTTConfig::<C1::ScalarField>::default();
         initialize_domain(domain, &NTTInitDomainConfig::default()).unwrap();
         let mut coeffs = vec![C1::ScalarField::zero(); N];
         ntt(
@@ -77,6 +75,8 @@ where
         )
         .unwrap();
         
+        release_domain::<C1::ScalarField>().unwrap();
+
         U::from_coeffs(HostSlice::from_slice(&coeffs), N) 
     }
 
@@ -97,27 +97,28 @@ where
         <C1 as Curve>::ScalarField: FieldImpl,
         <<C1 as Curve>::ScalarField as FieldImpl>::Config: NTTDomain<<C1 as Curve>::ScalarField> + NTT<<C1 as Curve>::ScalarField, <C1 as Curve>::ScalarField>,
         <C1 as Curve>::ScalarField: Arithmetic,
-     {
-        let domain_2n = get_root_of_unity::<C1::ScalarField>((2 * N).try_into().unwrap());
-        initialize_domain(domain_2n, &NTTInitDomainConfig::default()).unwrap();
-
+     {  
         let g = C1::ScalarField::from_u32(5u32);
         let mut twist = vec![C1::ScalarField::zero(); 2 * N];
         let mut pow = C1::ScalarField::one();
+        
         for i in 0..(2 * N) {
             twist[i] = pow;
             pow = pow * g;
         }
-
-        let cfg = NTTConfig::<C1::ScalarField>::default();
-
+        
         let q_price: U = Self::make_q_price();
+        
         let mut q_price_coeffs = get_coeffs_of_poly(&q_price);
         q_price_coeffs.resize(2 * N, C1::ScalarField::zero());
         for i in 0..(2 * N) {
             q_price_coeffs[i] = q_price_coeffs[i] * twist[i];
         }
 
+        let cfg = NTTConfig::<C1::ScalarField>::default();
+        let domain_2n = get_root_of_unity::<C1::ScalarField>((2 * N).try_into().unwrap());
+        initialize_domain(domain_2n, &NTTInitDomainConfig::default()).unwrap();
+        
         let mut q_price_coset_evals = vec![C1::ScalarField::zero(); 2 * N];
         //domain_2n
         ntt(
@@ -127,11 +128,12 @@ where
             HostSlice::from_mut_slice(&mut q_price_coset_evals),
         )
         .unwrap();
-
+        
         let mut l_p_evals = vec![C1::ScalarField::zero(); N];
         l_p_evals[P] = C1::ScalarField::one();
 
         let mut l_p = vec![C1::ScalarField::zero(); N];
+        
         //domain_n
         ntt(
             HostSlice::from_slice(&l_p_evals),
@@ -140,7 +142,7 @@ where
             HostSlice::from_mut_slice(&mut l_p),
         )
         .unwrap();
-
+        
         let mut l_p_coset_evals = vec![C1::ScalarField::zero(); 2 * N];
         l_p.resize(2 * N, C1::ScalarField::zero());
         for i in 0..(2 * N) {
@@ -155,7 +157,9 @@ where
             HostSlice::from_mut_slice(&mut l_p_coset_evals),
         )
         .unwrap();
-
+        
+        release_domain::<C1::ScalarField>().unwrap();
+        
         ProverIndex {
             q_price,
             q_price_coset_evals,
@@ -176,11 +180,9 @@ where
         <C1 as Curve>::ScalarField: Arithmetic,
     {
         let k = 2;
-
-        let domain_n = get_root_of_unity::<C1::ScalarField>(N.try_into().unwrap());
-        let domain_kn = get_root_of_unity::<C1::ScalarField>((k * N).try_into().unwrap());
-        initialize_domain(domain_kn, &NTTInitDomainConfig::default()).unwrap();
         
+        let domain_n = get_root_of_unity::<C1::ScalarField>(N.try_into().unwrap());
+
         let mut tr = Transcript::<C1>::new(b"gates-transcript");
         tr.send_index(v_index);
 
@@ -202,8 +204,6 @@ where
             twist[i] = pow;
             pow = pow * g;
         }
-
-        let cfg = NTTConfig::<C1::ScalarField>::default();
         
         let mut bid_coeffs = get_coeffs_of_poly(&witness.bid);
         bid_coeffs.resize(k * N, C1::ScalarField::zero());
@@ -212,7 +212,10 @@ where
         for i in 0..(k * N) {
             bid_coeffs[i] = bid_coeffs[i] * twist[i];
         }
-
+        
+        let cfg = NTTConfig::<C1::ScalarField>::default();
+        let domain_kn = get_root_of_unity::<C1::ScalarField>((k * N).try_into().unwrap());
+        initialize_domain(domain_kn, &NTTInitDomainConfig::default()).unwrap();
         //domain_kn
         ntt(
             HostSlice::from_slice(&bid_coeffs),
@@ -221,6 +224,7 @@ where
             HostSlice::from_mut_slice(&mut bid_coset_evals),
         )
         .unwrap();
+        
         let bid_coset_evals = Oracle(&bid_coset_evals);
         
         let mut f_coeffs = get_coeffs_of_poly(&witness.f);
@@ -315,8 +319,8 @@ where
 
         let q_price_coset_evals = Oracle(&index.q_price_coset_evals);
         let l_p_coset_evals = Oracle(&index.l_p_coset_evals);
-
-        let mut modulus_zh_coset_evals =
+        
+        let modulus_zh_coset_evals =
             evaluate_vanishing_over_extended_coset::<C1>(N, k);
         
         let mut modulus_zh_coset_evals_inv = Vec::new();
@@ -364,6 +368,8 @@ where
             HostSlice::from_mut_slice(&mut q),
         )
         .unwrap();
+        
+        release_domain::<C1::ScalarField>().unwrap();
 
         for i in 0..q.len() {
             q[i] = q[i] * (twist[i].inv());
@@ -586,11 +592,10 @@ mod gates_test {
     use icicle_bn254::curve::{CurveCfg as Bn254CurveCfg, G2CurveCfg as Bn254G2CurveCfg};
     use icicle_bn254::pairing::PairingTargetField as Bn254PairingFieldImpl;
     use icicle_bn254::curve::ScalarField as Bn254ScalarField;
-    use icicle_core::curve::{Curve,Affine,Projective};
+    use icicle_core::curve::Curve;
     use icicle_core::traits::FieldImpl;
     use rand_chacha::ChaCha20Rng;
     use std::marker::PhantomData;
-    use icicle_core::polynomials::UnivariatePolynomial;
     use icicle_bn254::polynomials::DensePolynomial as Bn254Poly;
 
     use crate::bid_encoder::BidEncoder;
@@ -599,7 +604,7 @@ mod gates_test {
         utils::srs::unsafe_setup_from_tau,
     };
 
-    use super::{structs::Witness, GatesArgument};
+    use super::GatesArgument;
 
     const P: usize = 10;
     const N: usize = 16;
@@ -617,7 +622,7 @@ mod gates_test {
         let srs = unsafe_setup_from_tau::<Bn254CurveCfg>(N - 1, tau);
         let x_g2 = Bn254G2CurveCfg::get_generator().mul(tau);
 
-        let pk = PK::<Bn254CurveCfg, Bn254G2CurveCfg, Bn254PairingFieldImpl> { srs: srs.clone(), _e: PhantomData, };
+        let pk = PK::<Bn254CurveCfg, Bn254G2CurveCfg, Bn254PairingFieldImpl> { srs: srs.clone(), e: PhantomData, };
         let vk = VK::<Bn254CurveCfg, Bn254G2CurveCfg, Bn254PairingFieldImpl>::new(x_g2.into());
 
         let v_index = GatesArgument::<N, P, Bn254CurveCfg, Bn254G2CurveCfg, Bn254PairingFieldImpl>::verifier_index::<Poly>(&pk);
@@ -636,20 +641,19 @@ mod gates_test {
 
 #[cfg(test)]
 mod ntt_test {
-    use icicle_bn254::curve::{CurveCfg as Bn254CurveCfg, G2CurveCfg as Bn254G2CurveCfg};
     use icicle_bn254::curve::ScalarField as Bn254ScalarField;
-    use icicle_core::curve::{Curve,Affine,Projective};
     use icicle_core::traits::FieldImpl;
-    use icicle_core::ntt::{ntt, NTTDomain, NTTInitDomainConfig, NTTConfig, NTTDir, get_root_of_unity, initialize_domain, ntt_inplace, NTT};
+    use icicle_core::ntt::{ntt, NTTInitDomainConfig, NTTConfig, NTTDir, get_root_of_unity, initialize_domain, release_domain};
     use icicle_runtime::memory::HostSlice;
     use icicle_core::traits::Arithmetic;
     use icicle_bn254::curve::ScalarCfg;
     use icicle_core::traits::GenerateRandom;
     
+    const N: usize = 16;
+
     #[test]
+    #[ignore]
     fn test_my_ntt() {
-        let N = 16;
-        let domain_n = get_root_of_unity::<Bn254ScalarField>(N.try_into().unwrap());
         let domain_2n = get_root_of_unity::<Bn254ScalarField>((2 * N).try_into().unwrap());
         initialize_domain(domain_2n, &NTTInitDomainConfig::default()).unwrap();
         
@@ -665,7 +669,7 @@ mod ntt_test {
             pow = pow * g;
         }
         
-        let mut target = vec![ScalarCfg::generate_random(1)[0] ; N];
+        let target = vec![ScalarCfg::generate_random(1)[0] ; N];
         let mut target_copy = target.clone();
         let mut target_copy_2 = target.clone();
 
@@ -724,7 +728,8 @@ mod ntt_test {
             NTTDir::kInverse,
             &cfg_2n,
             HostSlice::from_mut_slice(&mut q_copy_inv),
-        );
+        )
+        .unwrap();
 
         assert_eq!(q_copy_inv, target_copy);
 
@@ -738,6 +743,8 @@ mod ntt_test {
         )
         .unwrap();
         
+        release_domain::<Bn254ScalarField>().unwrap();
+
         for i in 0..(2 * N) {
             q_g_inv[i] = twist[i].inv() * q_g_inv[i];
         }

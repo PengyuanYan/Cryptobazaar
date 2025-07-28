@@ -5,7 +5,6 @@ use super::enums::{AVError, OracleState};
 use icicle_core::{msm, msm::MSMConfig};
 use icicle_runtime::memory::HostSlice;
 
-// TODO: handle errors instead of panics
 #[derive(Clone)]
 pub struct AVOracle<const B: usize, C: Curve> {
     state: OracleState,
@@ -97,16 +96,12 @@ impl<const B: usize, C: Curve + icicle_core::msm::MSM<C>> AVOracle<B, C> {
     pub fn output_first_round(&mut self) -> Vec<Affine::<C>> {
         assert_eq!(self.state, OracleState::Round1Completed);
 
-        // compute msgs
-        // let mut x = [-C::ScalarField::one(); B];
-        // x[0] = C::ScalarField::zero();
-
         let mut x = [C::ScalarField::one(); B];
         x[B - 1] = C::ScalarField::zero();
 
         let mut outputs = vec![Affine::<C>::zero(); B];
 
-        let mut cfg = MSMConfig::default();
+        let cfg = MSMConfig::default();
         let mut projective_output = vec![Projective::<C>::zero(); 1];
         
         msm::msm(
@@ -147,7 +142,7 @@ impl<const B: usize, C: Curve + icicle_core::msm::MSM<C>> AVOracle<B, C> {
 
         let ones = vec![C::ScalarField::one(); B];
 
-        let mut cfg = MSMConfig::default();
+        let cfg = MSMConfig::default();
         let mut projective_output = vec![Projective::<C>::zero(); 1];
         
         msm::msm(
@@ -170,22 +165,12 @@ mod av_oracle_tests {
 
     use super::AVOracle;
     const B: usize = 1024;
-    // use rayon::prelude::*;
 
-    use icicle_bn254::curve::{CurveCfg as Bn254CurveCfg, G2CurveCfg as Bn254G2CurveCfg, G1Projective, G1Affine, G2Projective};
-    use icicle_bn254::pairing::PairingTargetField as Bn254PairingFieldImpl;
-    use icicle_core::curve::{Curve,Affine,Projective};
-    use icicle_core::traits::FieldImpl;
+    use icicle_bn254::curve::{CurveCfg as Bn254CurveCfg};
+    use icicle_core::curve::{Curve,Affine};
     use icicle_core::traits::GenerateRandom;
 
-    use icicle_bn254::curve::ScalarField as Bn254ScalarField;
-
     use icicle_bn254::curve::ScalarCfg;
-    
-    // #[test]
-    // fn rayon() {
-    //     println!("Number of CPU cores utilized: {}", rayon::current_num_threads());
-    // }
 
     #[test]
     fn no_veto() {

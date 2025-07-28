@@ -2,7 +2,7 @@ use icicle_core::curve::{Curve,Affine};
 use icicle_core::pairing::Pairing;
 use icicle_core::traits::FieldImpl;
 use icicle_core::polynomials::UnivariatePolynomial;
-use icicle_core::ntt::{NTT};
+use icicle_core::ntt::NTT;
 use icicle_core::traits::Arithmetic;
 use rand::{RngCore, SeedableRng};
 

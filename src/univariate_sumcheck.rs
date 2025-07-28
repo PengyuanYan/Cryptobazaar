@@ -6,7 +6,7 @@ use icicle_core::polynomials::UnivariatePolynomial;
 use icicle_runtime::memory::HostSlice;
 use crate::utils::get_coeffs_of_poly;
 use icicle_core::traits::Arithmetic;
-use icicle_core::ntt::{get_root_of_unity,initialize_domain,NTTInitDomainConfig,NTTDomain};
+use icicle_core::ntt::{get_root_of_unity,initialize_domain,NTTInitDomainConfig,NTTDomain,release_domain};
 
 use structs::{Instance, Proof, Witness};
 
@@ -71,7 +71,7 @@ where
         let mut vanishing_poly_coeffs = Vec::with_capacity(len);
 
         vanishing_poly_coeffs.push(C1::ScalarField::zero() - C1::ScalarField::one());
-        for i in 0..(len - 2) {
+        for _ in 0..(len - 2) {
             vanishing_poly_coeffs.push(C1::ScalarField::zero());
         }
         vanishing_poly_coeffs.push(C1::ScalarField::one());
@@ -99,6 +99,8 @@ where
 
         let r_opening = r_mod_x.eval(&opening_challenge);
         let q_opening = q.eval(&opening_challenge);
+        
+        release_domain::<C1::ScalarField>().unwrap();
 
         tr.send_openings(&a_opening, &b_opening, &r_opening, &q_opening);
 
@@ -194,23 +196,18 @@ mod tests {
     use icicle_core::polynomials::UnivariatePolynomial;
     use icicle_runtime::memory::HostSlice;
     
-    use icicle_bn254::curve::{CurveCfg as Bn254CurveCfg, G2CurveCfg as Bn254G2CurveCfg, G1Projective, G1Affine, G2Projective};
+    use icicle_bn254::curve::{CurveCfg as Bn254CurveCfg, G2CurveCfg as Bn254G2CurveCfg};
     use icicle_bn254::pairing::PairingTargetField as Bn254PairingFieldImpl;
-    use icicle_core::curve::{Curve,Affine,Projective};
+    use icicle_core::curve::Curve;
 
     use icicle_bn254::curve::ScalarField as Bn254ScalarField;
     use icicle_core::traits::FieldImpl;
     
     use icicle_bn254::polynomials::DensePolynomial as Bn254Poly;
-    use icicle_core::ntt::{ntt, NTTDomain, NTTInitDomainConfig, NTTConfig, NTTDir, get_root_of_unity, initialize_domain, NTT};
+    use icicle_core::ntt::{ntt, NTTInitDomainConfig, NTTConfig, NTTDir, get_root_of_unity};
 
     use crate::utils::srs::unsafe_setup_from_tau;
     use std::marker::PhantomData;
-
-    use icicle_core::traits::Arithmetic;
-    use icicle_core::pairing::Pairing;
-
-    use std::ops::Mul;
 
     use super::*;
     use crate::kzg::{PK, VK};
@@ -223,7 +220,7 @@ mod tests {
         let a_coeffs = ScalarCfg::generate_random(n as usize);
         let a_poly = Bn254Poly::from_coeffs(HostSlice::from_slice(&a_coeffs), n as usize);
 
-        let mut cfg = NTTConfig::<Bn254ScalarField>::default();
+        let cfg = NTTConfig::<Bn254ScalarField>::default();
         initialize_domain(domain, &NTTInitDomainConfig::default()).unwrap();
         let mut a_evals = vec![Bn254ScalarField::zero(); n as usize];
 
@@ -248,6 +245,8 @@ mod tests {
         )
         .unwrap();
 
+        release_domain::<Bn254ScalarField>().unwrap();
+
         let mut sum = Bn254ScalarField::zero();
         for i in 0..a_evals.len() {
             sum = sum + (a_evals[i] * b_evals[i]);
@@ -265,7 +264,7 @@ mod tests {
 
         let vk = VK::<Bn254CurveCfg, Bn254G2CurveCfg, Bn254PairingFieldImpl>::new(x_g2.into());
         
-        let pk = PK::<Bn254CurveCfg, Bn254G2CurveCfg, Bn254PairingFieldImpl> { srs: srs.clone(), _e: PhantomData, };
+        let pk = PK::<Bn254CurveCfg, Bn254G2CurveCfg, Bn254PairingFieldImpl> { srs: srs.clone(), e: PhantomData, };
 
         let a_cm = Kzg::commit(&pk, &a_poly);
         let b_cm = Kzg::commit(&pk, &b_poly);
