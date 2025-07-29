@@ -205,3 +205,58 @@ impl<C: Curve> CanonicalDeserialize for Proof<C> {
         Ok(Self { q: q, acc_opening: opening, acc_shifted_opening: shifted_opening, q_0: q_0, q_1: q_1, q_2: q_2 })
     }
 }
+
+#[cfg(test)]
+mod serialize_test {
+    use icicle_bn254::curve::CurveCfg as Bn254CurveCfg;
+    use icicle_core::curve::Curve;
+    use icicle_bn254::curve::ScalarCfg;
+    
+    use ark_serialize::{CanonicalSerialize, CanonicalDeserialize, Compress};
+    use ark_serialize::Validate;
+    use icicle_core::traits::GenerateRandom;
+
+    use super::{Instance, Proof};
+
+    #[test]
+    fn test_serialize() {
+        let instance = Instance::<Bn254CurveCfg> { 
+                                n: 6usize,
+                                mu: ScalarCfg::generate_random(1)[0],
+                                acc_cm: Bn254CurveCfg::generate_random_affine_points(1)[0],
+        };
+
+        let mut data = Vec::new();
+        instance.serialize_with_mode(&mut data, Compress::No).unwrap();
+
+        let mut reader: &[u8] = &data;
+        let result = Instance::<Bn254CurveCfg>::deserialize_with_mode(&mut reader, Compress::No, Validate::No).unwrap();
+        
+        assert_eq!(instance.n, result.n);
+        assert_eq!(instance.mu, result.mu);
+        assert_eq!(instance.acc_cm, result.acc_cm);
+
+        let proof = Proof::<Bn254CurveCfg> {
+                           q: ScalarCfg::generate_random(1)[0],
+                           acc_opening: ScalarCfg::generate_random(1)[0],
+                           acc_shifted_opening: ScalarCfg::generate_random(1)[0],
+
+                           q_0: Bn254CurveCfg::generate_random_affine_points(1)[0],
+                           q_1: Bn254CurveCfg::generate_random_affine_points(1)[0],
+                           q_2: Bn254CurveCfg::generate_random_affine_points(1)[0],
+        };
+
+        let mut data = Vec::new();
+        proof.serialize_with_mode(&mut data, Compress::No).unwrap();
+
+        let mut reader: &[u8] = &data;
+        let result = Proof::<Bn254CurveCfg>::deserialize_with_mode(&mut reader, Compress::No, Validate::No).unwrap();
+
+        assert_eq!(proof.q, result.q);
+        assert_eq!(proof.acc_opening, result.acc_opening);
+        assert_eq!(proof.acc_shifted_opening, result.acc_shifted_opening);
+        assert_eq!(proof.q_0, result.q_0);
+        assert_eq!(proof.q_1, result.q_1);
+        assert_eq!(proof.q_2, result.q_2);
+    }
+}
