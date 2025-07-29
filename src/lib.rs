@@ -12,3 +12,6 @@ pub mod verifiable_folding_sumcheck;
 pub mod univariate_sumcheck;
 pub mod pedersen_schnorr;
 pub mod double_pedersen_schnorr;
+pub mod ipa;
+pub mod double_ipa;
+pub mod fold_lagrange;
