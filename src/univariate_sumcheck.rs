@@ -64,7 +64,7 @@ where
 
         let len = instance.n + 1;
         let poly_domain = get_root_of_unity::<C1::ScalarField>(len as u64);
-        initialize_domain(poly_domain, &NTTInitDomainConfig::default()).unwrap();
+        //initialize_domain(poly_domain, &NTTInitDomainConfig::default()).unwrap();
         let ab = witness.a_poly.mul(&witness.b_poly);
 
         let len = instance.n + 1;
@@ -100,7 +100,7 @@ where
         let r_opening = r_mod_x.eval(&opening_challenge);
         let q_opening = q.eval(&opening_challenge);
         
-        release_domain::<C1::ScalarField>().unwrap();
+        //release_domain::<C1::ScalarField>().unwrap();
 
         tr.send_openings(&a_opening, &b_opening, &r_opening, &q_opening);
 
@@ -212,16 +212,22 @@ mod tests {
     use super::*;
     use crate::kzg::{PK, VK};
 
+    use icicle_core::ntt::{initialize_domain, release_domain};
+
     #[test]
     fn sumcheck_test() {
         let n = 16;
+
+        let domain = get_root_of_unity::<Bn254ScalarField>((n * n).try_into().unwrap());
+        initialize_domain(domain, &NTTInitDomainConfig::default()).unwrap();
+
         let domain = get_root_of_unity::<Bn254ScalarField>(n);
 
         let a_coeffs = ScalarCfg::generate_random(n as usize);
         let a_poly = Bn254Poly::from_coeffs(HostSlice::from_slice(&a_coeffs), n as usize);
 
         let cfg = NTTConfig::<Bn254ScalarField>::default();
-        initialize_domain(domain, &NTTInitDomainConfig::default()).unwrap();
+        //initialize_domain(domain, &NTTInitDomainConfig::default()).unwrap();
         let mut a_evals = vec![Bn254ScalarField::zero(); n as usize];
 
         ntt(
@@ -245,7 +251,7 @@ mod tests {
         )
         .unwrap();
 
-        release_domain::<Bn254ScalarField>().unwrap();
+        //release_domain::<Bn254ScalarField>().unwrap();
 
         let mut sum = Bn254ScalarField::zero();
         for i in 0..a_evals.len() {
@@ -274,6 +280,8 @@ mod tests {
         let proof = UnivariateSumcheck::<Bn254CurveCfg, Bn254G2CurveCfg, Bn254PairingFieldImpl, Bn254Poly>::prove(&witness, &instance, &pk);
         
         let result = UnivariateSumcheck::<Bn254CurveCfg, Bn254G2CurveCfg, Bn254PairingFieldImpl, Bn254Poly>::verify(&proof, &instance, &vk);
+        
+        release_domain::<Bn254ScalarField>();
 
         assert!(result.is_ok());
     }

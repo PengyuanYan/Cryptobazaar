@@ -65,7 +65,7 @@ where
         q_price_evals.append(&mut zeros);
         
         let cfg = NTTConfig::<C1::ScalarField>::default();
-        initialize_domain(domain, &NTTInitDomainConfig::default()).unwrap();
+        //initialize_domain(domain, &NTTInitDomainConfig::default()).unwrap();
         let mut coeffs = vec![C1::ScalarField::zero(); N];
         ntt(
             HostSlice::from_slice(&q_price_evals),
@@ -75,7 +75,7 @@ where
         )
         .unwrap();
         
-        release_domain::<C1::ScalarField>().unwrap();
+        //release_domain::<C1::ScalarField>().unwrap();
 
         U::from_coeffs(HostSlice::from_slice(&coeffs), N) 
     }
@@ -117,7 +117,7 @@ where
 
         let cfg = NTTConfig::<C1::ScalarField>::default();
         let domain_2n = get_root_of_unity::<C1::ScalarField>((2 * N).try_into().unwrap());
-        initialize_domain(domain_2n, &NTTInitDomainConfig::default()).unwrap();
+        //initialize_domain(domain_2n, &NTTInitDomainConfig::default()).unwrap();
         
         let mut q_price_coset_evals = vec![C1::ScalarField::zero(); 2 * N];
         //domain_2n
@@ -158,7 +158,7 @@ where
         )
         .unwrap();
         
-        release_domain::<C1::ScalarField>().unwrap();
+        //release_domain::<C1::ScalarField>().unwrap();
         
         ProverIndex {
             q_price,
@@ -215,7 +215,7 @@ where
         
         let cfg = NTTConfig::<C1::ScalarField>::default();
         let domain_kn = get_root_of_unity::<C1::ScalarField>((k * N).try_into().unwrap());
-        initialize_domain(domain_kn, &NTTInitDomainConfig::default()).unwrap();
+        //initialize_domain(domain_kn, &NTTInitDomainConfig::default()).unwrap();
         //domain_kn
         ntt(
             HostSlice::from_slice(&bid_coeffs),
@@ -369,7 +369,7 @@ where
         )
         .unwrap();
         
-        release_domain::<C1::ScalarField>().unwrap();
+        //release_domain::<C1::ScalarField>().unwrap();
 
         for i in 0..q.len() {
             q[i] = q[i] * (twist[i].inv());
@@ -606,6 +606,8 @@ mod gates_test {
 
     use super::GatesArgument;
 
+    use icicle_core::ntt::{NTTInitDomainConfig, initialize_domain, release_domain, get_root_of_unity};
+
     const P: usize = 10;
     const N: usize = 16;
 
@@ -617,6 +619,9 @@ mod gates_test {
     #[test]
     fn test_gates() {
         type Poly = Bn254Poly;
+
+        let domain = get_root_of_unity::<Bn254ScalarField>((N * N).try_into().unwrap());
+        initialize_domain(domain, &NTTInitDomainConfig::default()).unwrap();
 
         let tau = Bn254ScalarField::from_u32(17u32);
         let srs = unsafe_setup_from_tau::<Bn254CurveCfg>(N - 1, tau);
@@ -635,6 +640,9 @@ mod gates_test {
 
         let proof = GatesArgument::<N, P, Bn254CurveCfg, Bn254G2CurveCfg, Bn254PairingFieldImpl>::prove(&witness, &v_index, &p_index, &pk);
         let result = GatesArgument::<N, P, Bn254CurveCfg, Bn254G2CurveCfg, Bn254PairingFieldImpl>::verify(&v_index, &proof, &vk);
+
+        release_domain::<Bn254ScalarField>();
+
         assert!(result.is_ok());
     }
 }
@@ -743,7 +751,7 @@ mod ntt_test {
         )
         .unwrap();
         
-        release_domain::<Bn254ScalarField>().unwrap();
+        //release_domain::<Bn254ScalarField>().unwrap();
 
         for i in 0..(2 * N) {
             q_g_inv[i] = twist[i].inv() * q_g_inv[i];

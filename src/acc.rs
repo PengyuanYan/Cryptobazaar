@@ -194,10 +194,16 @@ mod acc_tests {
     use icicle_bn254::polynomials::DensePolynomial as Bn254DensePolynomial;
     use icicle_core::polynomials::UnivariatePolynomial;
     
+    use icicle_core::ntt::{get_root_of_unity,release_domain};
+
     #[test]
     
     fn test_acc() {
         let n: usize = 16;
+
+        let domain = get_root_of_unity::<Bn254ScalarField>((n * 2).try_into().unwrap());
+        initialize_domain(domain, &NTTInitDomainConfig::default()).unwrap();
+
         let rou = ntt::get_root_of_unity::<Bn254ScalarField>(n.try_into().unwrap());
         let tau = Bn254ScalarField::from_u32(17u32);
         let srs = unsafe_setup_from_tau::<Bn254CurveCfg>(n - 1, tau);
@@ -216,7 +222,7 @@ mod acc_tests {
             .collect();
 
         let cfg = NTTConfig::<Bn254ScalarField>::default();
-        initialize_domain(rou, &NTTInitDomainConfig::default()).unwrap();
+        //initialize_domain(rou, &NTTInitDomainConfig::default()).unwrap();
         let mut coeffs = vec![Bn254ScalarField::zero(); evals.len()];
         ntt(
             HostSlice::from_slice(&evals),
@@ -236,6 +242,8 @@ mod acc_tests {
         let proof  = Argument::prove(&instance, &witness, &pk);
         
         let check  = Argument::verify(&instance, &proof, &vk);
+        
+        release_domain::<Bn254ScalarField>();
 
         assert!(check.is_ok());
     }

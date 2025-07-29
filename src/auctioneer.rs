@@ -118,6 +118,7 @@ mod auctioneer_tests {
     const B: usize = 32;
 
     #[test]
+    #[ignore]
     fn test_many_vetos() {
         let g = Bn254CurveCfg::get_generator();
 

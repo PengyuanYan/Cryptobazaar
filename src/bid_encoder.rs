@@ -71,7 +71,7 @@ impl<const P: usize, const N: usize, C: Curve> BidEncoder<P, N, C> {
         let cfg = NTTConfig::<C::ScalarField>::default();
         
         let mut bid_coeffs = vec![C::ScalarField::zero(); N];
-        initialize_domain(domain, &NTTInitDomainConfig::default()).unwrap();
+        //initialize_domain(domain, &NTTInitDomainConfig::default()).unwrap();
         ntt(
             HostSlice::from_slice(&self.bid),
             NTTDir::kInverse,
@@ -148,7 +148,7 @@ impl<const P: usize, const N: usize, C: Curve> BidEncoder<P, N, C> {
         )
         .unwrap();
 
-        release_domain::<C::ScalarField>().unwrap();
+        //release_domain::<C::ScalarField>().unwrap();
 
         let diff = UnivariatePolynomial::from_coeffs(HostSlice::from_slice(&diff_ntt_evals), diff_ntt_evals.len());
         let g = UnivariatePolynomial::from_coeffs(HostSlice::from_slice(&g_ntt_evals), g_ntt_evals.len());

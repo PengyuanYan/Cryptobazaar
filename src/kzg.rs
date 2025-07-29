@@ -142,15 +142,17 @@ where
         P: UnivariatePolynomial<Field = C1::ScalarField>,
         <C1 as Curve>::ScalarField: Arithmetic,
     {
-        let powers_of_gamma = std::iter::successors(Some(separation_challenge), |p| {
+        let powers_of_gamma: Vec<_> = std::iter::successors(Some(separation_challenge), |p| {
             Some(*p * separation_challenge)
-        });
+        })
+        .take(polys.len())
+        .collect();
         
         //these poly related functions dont need ntt
         let mut batched = polys[0].clone();
-        for (p_i, gamma_pow_i) in polys.iter().skip(1).zip(powers_of_gamma) {
-            let gamma_poly = p_i.mul_by_scalar(&gamma_pow_i);
-            batched = gamma_poly.add(&batched);
+        for i in 1..polys.len() {
+           let gamma_poly = polys[i].mul_by_scalar(&powers_of_gamma[i - 1]);
+           batched = gamma_poly.add(&batched);
         }
         
         let coeffs = [C1::ScalarField::zero() - opening_challenge, C1::ScalarField::one()];
@@ -197,11 +199,10 @@ where
         )
         .unwrap();
         
-        let batched_eval: C1::ScalarField = evaluations
-            .iter()
-            .zip(powers_of_gamma.iter())
-            .map(|(&ei, &gamma_i)| ei * gamma_i)
-            .fold(C1::ScalarField::zero(), |acc, x| acc + x);
+        let mut batched_eval = C1::ScalarField::zero();
+        for i in 0..evaluations.len() {
+            batched_eval = batched_eval + evaluations[i] * powers_of_gamma[i];
+        }
         
         /*
             (p(X) - y) = q(X)(X - z)

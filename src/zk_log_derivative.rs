@@ -69,7 +69,7 @@ where
         s_evals.append(&mut zeros);
          
         let cfg = NTTConfig::<C1::ScalarField>::default();
-        initialize_domain(domain, &NTTInitDomainConfig::default()).unwrap();
+        //initialize_domain(domain, &NTTInitDomainConfig::default()).unwrap();
         let mut coeffs = vec![C1::ScalarField::zero(); N];
         ntt(
             HostSlice::from_slice(&s_evals),
@@ -79,7 +79,7 @@ where
         )
         .unwrap();
 
-        release_domain::<C1::ScalarField>().unwrap();
+        //release_domain::<C1::ScalarField>().unwrap();
 
         let s = U::from_coeffs(HostSlice::from_slice(&coeffs), N);
         let s_cm = Kzg::commit(pk, &s);
@@ -108,7 +108,7 @@ where
         s_evals.append(&mut zeros);
         
         let cfg = NTTConfig::<C1::ScalarField>::default();
-        initialize_domain(domain, &NTTInitDomainConfig::default()).unwrap();
+        //initialize_domain(domain, &NTTInitDomainConfig::default()).unwrap();
         let mut s_coeffs = vec![C1::ScalarField::zero(); N];
         ntt(
             HostSlice::from_slice(&s_evals),
@@ -134,7 +134,7 @@ where
         )
         .unwrap();
         
-        release_domain::<C1::ScalarField>().unwrap();
+        //release_domain::<C1::ScalarField>().unwrap();
 
         ProverIndex {
             s: U::from_coeffs(HostSlice::from_slice(&s_coeffs_clone), N),
@@ -166,7 +166,7 @@ where
         let mut f_coeffs = get_coeffs_of_poly(&witness.f);
 
         let cfg = NTTConfig::<C1::ScalarField>::default();
-        initialize_domain(domain, &NTTInitDomainConfig::default()).unwrap();
+        //initialize_domain(domain, &NTTInitDomainConfig::default()).unwrap();
         let mut f_evals = vec![C1::ScalarField::zero(); N];
         ntt(
             HostSlice::from_slice(&f_coeffs),
@@ -294,7 +294,7 @@ where
             separation_challenge,
         );
         
-        release_domain::<C1::ScalarField>().unwrap();
+        //release_domain::<C1::ScalarField>().unwrap();
 
         Proof {
             gamma,
@@ -414,6 +414,9 @@ mod log_derivative_tests {
 
     #[test]
     fn test_log_derivative() {
+        let domain = get_root_of_unity::<Bn254ScalarField>((N * N).try_into().unwrap());
+        initialize_domain(domain, &NTTInitDomainConfig::default()).unwrap();
+
         let domain = get_root_of_unity::<Bn254ScalarField>(N.try_into().unwrap());
 
         let tau = Bn254ScalarField::from_u32(17u32);
@@ -435,7 +438,7 @@ mod log_derivative_tests {
         f_evals.append(&mut blinders);
         
         let cfg = NTTConfig::<Bn254ScalarField>::default();
-        initialize_domain(domain, &NTTInitDomainConfig::default()).unwrap();
+        //initialize_domain(domain, &NTTInitDomainConfig::default()).unwrap();
         let mut f_coeffs = vec![Bn254ScalarField::zero(); N];
         ntt(
             HostSlice::from_slice(&f_evals),
@@ -445,7 +448,7 @@ mod log_derivative_tests {
         )
         .unwrap();
 
-        release_domain::<Bn254ScalarField>().unwrap();
+        //release_domain::<Bn254ScalarField>().unwrap();
 
         let f = Bn254Poly::from_coeffs(HostSlice::from_slice(&f_coeffs), N);
         let f_cm = Kzg::commit(&pk, &f);
@@ -475,6 +478,9 @@ mod log_derivative_tests {
         }
 
         let result = Argument::<N, B, Bn254CurveCfg, Bn254G2CurveCfg, Bn254PairingFieldImpl, Bn254Poly>::verify(&index_v, &instance, &proof, &vk, &relation);
+
+        release_domain::<Bn254ScalarField>().unwrap();
+
         assert!(result.is_ok());
     }
 }

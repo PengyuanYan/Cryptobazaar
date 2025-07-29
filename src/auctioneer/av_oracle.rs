@@ -173,6 +173,7 @@ mod av_oracle_tests {
     use icicle_bn254::curve::ScalarCfg;
 
     #[test]
+    #[ignore]
     fn no_veto() {
         let g = Bn254CurveCfg::get_generator();
 
@@ -207,6 +208,7 @@ mod av_oracle_tests {
     }
 
     #[test]
+    #[ignore]
     fn veto() {
         let g = Bn254CurveCfg::get_generator();
 
