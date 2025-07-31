@@ -118,7 +118,7 @@ mod auctioneer_tests {
     const B: usize = 32;
 
     #[test]
-    #[ignore]
+    // #[ignore]
     fn test_many_vetos() {
         let g = Bn254CurveCfg::get_generator();
 
@@ -126,14 +126,14 @@ mod auctioneer_tests {
         let mut secrets = vec![vec![<Bn254CurveCfg as Curve>::ScalarField::zero(); N]; B];
         let mut first_msgs = vec![vec![Affine::<Bn254CurveCfg>::zero(); N]; B];
 
-        // initialize n msgs fro each party
+        // initialize n msgs for each party
         for i in 0..B {
             for j in 0..N {
                 secrets[i][j] = ScalarCfg::generate_random(1)[0];
             }
         }
 
-        // initialize n msgs fro each party
+        // initialize n msgs for each party
         for i in 0..B {
             for j in 0..N {
                 first_msgs[i][j] = g.mul(secrets[i][j]).into();

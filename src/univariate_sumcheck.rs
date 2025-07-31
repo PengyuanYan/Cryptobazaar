@@ -62,8 +62,8 @@ where
 
         tr.send_instance(instance);
 
-        let len = instance.n + 1;
-        let poly_domain = get_root_of_unity::<C1::ScalarField>(len as u64);
+        //let len = instance.n + 1;
+        //let poly_domain = get_root_of_unity::<C1::ScalarField>(len as u64);
         //initialize_domain(poly_domain, &NTTInitDomainConfig::default()).unwrap();
         let ab = witness.a_poly.mul(&witness.b_poly);
 
@@ -221,7 +221,7 @@ mod tests {
         let domain = get_root_of_unity::<Bn254ScalarField>((n * n).try_into().unwrap());
         initialize_domain(domain, &NTTInitDomainConfig::default()).unwrap();
 
-        let domain = get_root_of_unity::<Bn254ScalarField>(n);
+        //let domain = get_root_of_unity::<Bn254ScalarField>(n);
 
         let a_coeffs = ScalarCfg::generate_random(n as usize);
         let a_poly = Bn254Poly::from_coeffs(HostSlice::from_slice(&a_coeffs), n as usize);
@@ -281,7 +281,7 @@ mod tests {
         
         let result = UnivariateSumcheck::<Bn254CurveCfg, Bn254G2CurveCfg, Bn254PairingFieldImpl, Bn254Poly>::verify(&proof, &instance, &vk);
         
-        release_domain::<Bn254ScalarField>();
+        release_domain::<Bn254ScalarField>().unwrap();
 
         assert!(result.is_ok());
     }

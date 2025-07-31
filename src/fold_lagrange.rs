@@ -93,7 +93,7 @@ where
             sum = folding_coeffs[i] * beta_powers[i] + sum;
         }
         
-        let domain = get_root_of_unity::<C1::ScalarField>((N).try_into().unwrap());
+        //let domain = get_root_of_unity::<C1::ScalarField>((N).try_into().unwrap());
         let cfg_ntt = NTTConfig::<C1::ScalarField>::default();
         //initialize_domain(domain, &NTTInitDomainConfig::default()).unwrap();
         let mut p_coeffs = vec![C1::ScalarField::zero(); folding_coeffs.len()];
@@ -268,7 +268,7 @@ mod lagrange_fold_tests {
         let proof = Argument::<N, LOG_N, Bn254CurveCfg, Bn254G2CurveCfg, Bn254PairingFieldImpl, Bn254Poly>::prove(&pk, &instance);
         let res = Argument::<N, LOG_N, Bn254CurveCfg, Bn254G2CurveCfg, Bn254PairingFieldImpl, Bn254Poly>::verify(&proof, &instance, &vk);
         
-        release_domain::<Bn254ScalarField>();
+        release_domain::<Bn254ScalarField>().unwrap();
 
         assert!(res.is_ok());
     }

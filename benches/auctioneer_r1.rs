@@ -11,9 +11,6 @@ use criterion::{criterion_group, criterion_main, Criterion};
 
 use cryptobazaar::utils::load_backend;
 
-const N: usize = 8192;
-const B: usize = 256;
-
 /* RUN WITH: cargo bench --bench auctioneer_r1 */
 
 fn setup_round_1<const N: usize, const B: usize>() -> Auctioneer<N, B, Bn254CurveCfg> {
@@ -114,26 +111,16 @@ fn bench_first_round<const N: usize, const B: usize>(
 }
 
 fn round_1(c: &mut Criterion) {
-    //const N: usize = 8192;
-    //const B: usize = 256;
+    const N: usize = 8192;
+    const B: usize = 256;
 
     let a = setup_round_1::<N, B>();
     let id = format!("Round1: range = {}, bidders = {}", N, B);
     c.bench_function(&id, |b| b.iter(|| bench_first_round(a.clone())));
 }
 
-fn round_2(c: &mut Criterion) {
-    //const N: usize = 32;
-    //const B: usize = 32;
-
-    let a = setup_round_2::<N, B>();
-    let id = format!("Round2: range = {}, bidders = {}", N, B);
-    c.bench_function(&id, |b| b.iter(|| bench_second_round(a.clone())));
-}
-
 fn criterion_benchmark(c: &mut Criterion) {
     round_1(c);
-    // round_2(c);
 }
 
 criterion_group!(benches, criterion_benchmark);

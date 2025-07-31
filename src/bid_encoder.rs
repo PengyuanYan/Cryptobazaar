@@ -66,7 +66,7 @@ impl<const P: usize, const N: usize, C: Curve> BidEncoder<P, N, C> {
         <C as Curve>::ScalarField: Arithmetic,
     {
         let mut rng = R::from_seed(seed);
-        let domain = get_root_of_unity::<C::ScalarField>((N).try_into().unwrap());
+        //let domain = get_root_of_unity::<C::ScalarField>((N).try_into().unwrap());
         
         let cfg = NTTConfig::<C::ScalarField>::default();
         
@@ -148,7 +148,7 @@ impl<const P: usize, const N: usize, C: Curve> BidEncoder<P, N, C> {
         )
         .unwrap();
 
-        //release_domain::<C::ScalarField>().unwrap();
+        release_domain::<C::ScalarField>().unwrap();
 
         let diff = UnivariatePolynomial::from_coeffs(HostSlice::from_slice(&diff_ntt_evals), diff_ntt_evals.len());
         let g = UnivariatePolynomial::from_coeffs(HostSlice::from_slice(&g_ntt_evals), g_ntt_evals.len());

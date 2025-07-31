@@ -182,7 +182,6 @@ mod acc_tests {
     use icicle_runtime::memory::HostSlice;
 
     use icicle_core::{ntt::{
-        self,
         NTTConfig, NTTDir, NTTInitDomainConfig, ntt, initialize_domain
     }};
 
@@ -204,7 +203,7 @@ mod acc_tests {
         let domain = get_root_of_unity::<Bn254ScalarField>((n * 2).try_into().unwrap());
         initialize_domain(domain, &NTTInitDomainConfig::default()).unwrap();
 
-        let rou = ntt::get_root_of_unity::<Bn254ScalarField>(n.try_into().unwrap());
+        //let rou = ntt::get_root_of_unity::<Bn254ScalarField>(n.try_into().unwrap());
         let tau = Bn254ScalarField::from_u32(17u32);
         let srs = unsafe_setup_from_tau::<Bn254CurveCfg>(n - 1, tau);
 
@@ -243,7 +242,7 @@ mod acc_tests {
         
         let check  = Argument::verify(&instance, &proof, &vk);
         
-        release_domain::<Bn254ScalarField>();
+        release_domain::<Bn254ScalarField>().unwrap();
 
         assert!(check.is_ok());
     }

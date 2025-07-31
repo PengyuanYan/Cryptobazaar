@@ -377,7 +377,6 @@ mod double_ipa_tests {
     use icicle_bn254::polynomials::DensePolynomial as Bn254Poly;
     use icicle_core::ntt::get_root_of_unity;
     use icicle_runtime::memory::HostSlice;
-    use icicle_core::traits::Arithmetic;
     use icicle_bn254::curve::ScalarCfg;
     use icicle_core::traits::GenerateRandom;
     use icicle_core::{msm, msm::MSMConfig};
@@ -473,6 +472,6 @@ mod double_ipa_tests {
         
         DoubleInnerProduct::<N, LOG_N, Bn254CurveCfg, Bn254G2CurveCfg, Bn254PairingFieldImpl, Bn254Poly>::verify(&instance, &proof, &vk);
 
-        release_domain::<Bn254ScalarField>();
+        release_domain::<Bn254ScalarField>().unwrap();
     }
 }

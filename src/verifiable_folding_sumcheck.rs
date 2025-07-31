@@ -68,7 +68,7 @@ where
     {
         assert!(is_pow_2(instance.n));
 
-        let domain = get_root_of_unity::<C1::ScalarField>(instance.n.try_into().unwrap());
+        //let domain = get_root_of_unity::<C1::ScalarField>(instance.n.try_into().unwrap());
         let mut tr = Transcript::new(b"verifiable-folding-sumcheck");
 
         tr.send_instance(instance);
@@ -109,8 +109,8 @@ where
         let a_nof_coeffs = witness.a.get_nof_coeffs();
         let b_nof_coeffs:u64 = b_coeffs.len().try_into().unwrap();
         assert_eq!(a_nof_coeffs, b_nof_coeffs);
-        let max_domain_size:u64= a_nof_coeffs + b_nof_coeffs;
-        let poly_domain = get_root_of_unity::<C1::ScalarField>(max_domain_size);
+        //let max_domain_size:u64= a_nof_coeffs + b_nof_coeffs;
+        //let poly_domain = get_root_of_unity::<C1::ScalarField>(max_domain_size);
         //initialize_domain(poly_domain, &NTTInitDomainConfig::default()).unwrap();
 
         let mut lhs_product = witness.a.mul(&b);
@@ -130,7 +130,7 @@ where
 
         let domain_vanishing_poly = U::from_coeffs(HostSlice::from_slice(&vanishing_poly_coeffs), len);
         
-        let poly_domain = get_root_of_unity::<C1::ScalarField>(len as u64);
+        //let poly_domain = get_root_of_unity::<C1::ScalarField>(len as u64);
         //initialize_domain(poly_domain, &NTTInitDomainConfig::default()).unwrap();
 
         let (q, r) = lhs.divide(&domain_vanishing_poly);
@@ -358,7 +358,7 @@ mod verifiable_folding_sumcheck_tests {
         let domain = get_root_of_unity::<Bn254ScalarField>((n * n).try_into().unwrap());
         initialize_domain(domain, &NTTInitDomainConfig::default()).unwrap();
 
-        let domain = get_root_of_unity::<Bn254ScalarField>(n);
+        //let domain = get_root_of_unity::<Bn254ScalarField>(n);
 
         let tau = Bn254ScalarField::from_u32(100u32);
         let srs = unsafe_setup_from_tau::<Bn254CurveCfg>((n - 1) as usize, tau);

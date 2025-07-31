@@ -2,7 +2,7 @@ use icicle_core::curve::{Curve, Affine, Projective};
 use icicle_core::traits::FieldImpl;
 use icicle_core::ntt::{NTTDomain, get_root_of_unity};
 use icicle_core::traits::Arithmetic;
-use crate::utils::{is_pow_2, get_coeffs_of_poly};
+use crate::utils::is_pow_2;
 use icicle_core::polynomials::UnivariatePolynomial;
 use icicle_runtime::memory::HostSlice;
 
@@ -62,7 +62,7 @@ where
     let mut bases = Vec::with_capacity(n);
     
     for i in 0..n {
-        let mut coeff = vec![C::ScalarField::one(), C::ScalarField::zero()];
+        let coeff = vec![C::ScalarField::one(), C::ScalarField::zero()];
         let mut li = P::from_coeffs(HostSlice::from_slice(&coeff), 2);
 
         let x_i = roots[i];
@@ -86,7 +86,6 @@ where
 mod lagrange_test {
     use icicle_bn254::curve::CurveCfg as Bn254CurveCfg;
     use icicle_bn254::curve::ScalarField as Bn254ScalarField;
-    use icicle_bn254::pairing::PairingTargetField as Bn254PairingFieldImpl;
     use icicle_core::curve::{Curve,Affine,Projective};
     use icicle_core::polynomials::UnivariatePolynomial;
     use icicle_bn254::polynomials::DensePolynomial as Bn254Poly;

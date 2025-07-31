@@ -12,7 +12,7 @@ use icicle_core::pairing::Pairing;
 use icicle_core::traits::FieldImpl;
 use std::marker::PhantomData;
 use icicle_core::polynomials::UnivariatePolynomial;
-use icicle_core::ntt::{ntt, NTTDomain, NTTInitDomainConfig, NTTConfig, NTTDir, get_root_of_unity, initialize_domain, NTT, release_domain};
+use icicle_core::ntt::{ntt, NTTDomain, NTTInitDomainConfig, NTTConfig, NTTDir, get_root_of_unity, initialize_domain, ntt_inplace, NTT, release_domain};
 use icicle_runtime::memory::HostSlice;
 use icicle_core::traits::Arithmetic;
 
@@ -58,7 +58,7 @@ where
         <C1 as Curve>::ScalarField: FieldImpl,
         <<C1 as Curve>::ScalarField as FieldImpl>::Config: NTTDomain<<C1 as Curve>::ScalarField> + NTT<<C1 as Curve>::ScalarField, <C1 as Curve>::ScalarField>,
      {
-        let domain = get_root_of_unity::<C1::ScalarField>(N.try_into().unwrap());
+        //let domain = get_root_of_unity::<C1::ScalarField>(N.try_into().unwrap());
 
         let mut q_price_evals = vec![C1::ScalarField::one(); P];
         let mut zeros = vec![C1::ScalarField::zero(); N - P];
@@ -116,7 +116,7 @@ where
         }
 
         let cfg = NTTConfig::<C1::ScalarField>::default();
-        let domain_2n = get_root_of_unity::<C1::ScalarField>((2 * N).try_into().unwrap());
+        //let domain_2n = get_root_of_unity::<C1::ScalarField>((2 * N).try_into().unwrap());
         //initialize_domain(domain_2n, &NTTInitDomainConfig::default()).unwrap();
         
         let mut q_price_coset_evals = vec![C1::ScalarField::zero(); 2 * N];
@@ -214,7 +214,7 @@ where
         }
         
         let cfg = NTTConfig::<C1::ScalarField>::default();
-        let domain_kn = get_root_of_unity::<C1::ScalarField>((k * N).try_into().unwrap());
+        //let domain_kn = get_root_of_unity::<C1::ScalarField>((k * N).try_into().unwrap());
         //initialize_domain(domain_kn, &NTTInitDomainConfig::default()).unwrap();
         //domain_kn
         ntt(
@@ -641,7 +641,7 @@ mod gates_test {
         let proof = GatesArgument::<N, P, Bn254CurveCfg, Bn254G2CurveCfg, Bn254PairingFieldImpl>::prove(&witness, &v_index, &p_index, &pk);
         let result = GatesArgument::<N, P, Bn254CurveCfg, Bn254G2CurveCfg, Bn254PairingFieldImpl>::verify(&v_index, &proof, &vk);
 
-        release_domain::<Bn254ScalarField>();
+        release_domain::<Bn254ScalarField>().unwrap();
 
         assert!(result.is_ok());
     }
@@ -751,11 +751,11 @@ mod ntt_test {
         )
         .unwrap();
         
-        //release_domain::<Bn254ScalarField>().unwrap();
-
         for i in 0..(2 * N) {
             q_g_inv[i] = twist[i].inv() * q_g_inv[i];
         }
+
+        release_domain::<Bn254ScalarField>().unwrap();
 
         assert_eq!(q_g_inv, target_copy);
     }

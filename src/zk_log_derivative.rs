@@ -61,7 +61,7 @@ where
     where
         <<C1 as Curve>::ScalarField as FieldImpl>::Config: NTTDomain<<C1 as Curve>::ScalarField> + NTT<<C1 as Curve>::ScalarField, <C1 as Curve>::ScalarField>,
     {
-        let domain = get_root_of_unity::<C1::ScalarField>(N.try_into().unwrap());
+        //let domain = get_root_of_unity::<C1::ScalarField>(N.try_into().unwrap());
 
         let mut zeros = vec![C1::ScalarField::zero(); B];
         let mut s_evals = vec![C1::ScalarField::one(); N - B];
@@ -92,7 +92,7 @@ where
         <C1 as Curve>::ScalarField: Arithmetic,
         <<C1 as Curve>::ScalarField as FieldImpl>::Config: NTTDomain<<C1 as Curve>::ScalarField> + NTT<<C1 as Curve>::ScalarField, <C1 as Curve>::ScalarField>,
     {
-        let domain = get_root_of_unity::<C1::ScalarField>(N.try_into().unwrap());
+        //let domain = get_root_of_unity::<C1::ScalarField>(N.try_into().unwrap());
         let g = C1::ScalarField::from_u32(5u32);
 
         let mut twist = vec![C1::ScalarField::zero(); N];
@@ -153,7 +153,7 @@ where
         <C1 as Curve>::ScalarField: Arithmetic,
         <<C1 as Curve>::ScalarField as FieldImpl>::Config: NTTDomain<<C1 as Curve>::ScalarField> + NTT<<C1 as Curve>::ScalarField, <C1 as Curve>::ScalarField>,
     {
-        let domain = get_root_of_unity::<C1::ScalarField>(N.try_into().unwrap());
+        //let domain = get_root_of_unity::<C1::ScalarField>(N.try_into().unwrap());
         let g = C1::ScalarField::from_u32(5u32);
 
         let mut twist = vec![C1::ScalarField::zero(); N];
@@ -417,7 +417,7 @@ mod log_derivative_tests {
         let domain = get_root_of_unity::<Bn254ScalarField>((N * N).try_into().unwrap());
         initialize_domain(domain, &NTTInitDomainConfig::default()).unwrap();
 
-        let domain = get_root_of_unity::<Bn254ScalarField>(N.try_into().unwrap());
+        //let domain = get_root_of_unity::<Bn254ScalarField>(N.try_into().unwrap());
 
         let tau = Bn254ScalarField::from_u32(17u32);
         let srs = unsafe_setup_from_tau::<Bn254CurveCfg>(N - 1, tau);

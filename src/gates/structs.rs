@@ -98,7 +98,6 @@ where
     pub e: PhantomData<C>,
 }
 
-//#[derive(CanonicalSerialize, CanonicalDeserialize)]
 pub struct Proof<C: Curve> {
     pub bid_cm: Affine::<C>,
     pub r_cm: Affine::<C>,
@@ -300,5 +299,87 @@ impl<C: Curve> CanonicalDeserialize for Proof<C> {
                   q_chunk_0_opening, q_chunk_1_opening,
                   w_0, w_1
         })
+    }
+}
+
+#[cfg(test)]
+mod serialize_test {
+    use icicle_bn254::curve::CurveCfg as Bn254CurveCfg;
+    use icicle_core::curve::Curve;
+    use icicle_bn254::curve::ScalarCfg;
+    
+    use ark_serialize::{CanonicalSerialize, CanonicalDeserialize, Compress};
+    use ark_serialize::Validate;
+    use icicle_core::traits::GenerateRandom;
+
+    use super::{VerifierIndex, Proof};
+
+    #[test]
+    fn test_serialize() {
+        let verifierindex = VerifierIndex::<Bn254CurveCfg> { 
+                                q_price_cm: Bn254CurveCfg::generate_random_affine_points(1)[0],
+        };
+        
+        let mut data = Vec::new();
+        verifierindex.serialize_with_mode(&mut data, Compress::No).unwrap();
+
+        let mut reader: &[u8] = &data;
+        let result = VerifierIndex::<Bn254CurveCfg>::deserialize_with_mode(&mut reader, Compress::No, Validate::No).unwrap();
+        
+        assert_eq!(verifierindex.q_price_cm, result.q_price_cm);
+
+        let proof = Proof::<Bn254CurveCfg> {
+                            bid_cm: Bn254CurveCfg::generate_random_affine_points(1)[0],
+                            r_cm: Bn254CurveCfg::generate_random_affine_points(1)[0],
+                            r_inv_cm: Bn254CurveCfg::generate_random_affine_points(1)[0],
+                            f_cm: Bn254CurveCfg::generate_random_affine_points(1)[0],
+                            diff_cm: Bn254CurveCfg::generate_random_affine_points(1)[0],
+                            g_cm: Bn254CurveCfg::generate_random_affine_points(1)[0],
+
+                            q_price_opening: ScalarCfg::generate_random(1)[0],
+                            bid_opening: ScalarCfg::generate_random(1)[0],
+                            bid_shift_opening: ScalarCfg::generate_random(1)[0],
+                            f_opening: ScalarCfg::generate_random(1)[0],
+                            r_opening: ScalarCfg::generate_random(1)[0],
+                            r_inv_opening: ScalarCfg::generate_random(1)[0],
+                            diff_opening: ScalarCfg::generate_random(1)[0],
+                            g_opening: ScalarCfg::generate_random(1)[0],
+
+                            q_chunk_0_cm: Bn254CurveCfg::generate_random_affine_points(1)[0],
+                            q_chunk_1_cm: Bn254CurveCfg::generate_random_affine_points(1)[0],
+
+                            q_chunk_0_opening: ScalarCfg::generate_random(1)[0],
+                            q_chunk_1_opening: ScalarCfg::generate_random(1)[0],
+ 
+                            w_0: Bn254CurveCfg::generate_random_affine_points(1)[0],
+                            w_1: Bn254CurveCfg::generate_random_affine_points(1)[0],
+        };
+
+        let mut data = Vec::new();
+        proof.serialize_with_mode(&mut data, Compress::No).unwrap();
+
+        let mut reader: &[u8] = &data;
+        let result = Proof::<Bn254CurveCfg>::deserialize_with_mode(&mut reader, Compress::No, Validate::No).unwrap();
+
+        assert_eq!(proof.bid_cm, result.bid_cm);
+        assert_eq!(proof.r_cm, result.r_cm);
+        assert_eq!(proof.r_inv_cm, result.r_inv_cm);
+        assert_eq!(proof.f_cm, result.f_cm);
+        assert_eq!(proof.diff_cm, result.diff_cm);
+        assert_eq!(proof.g_cm, result.g_cm);
+        assert_eq!(proof.q_price_opening, result.q_price_opening);
+        assert_eq!(proof.bid_opening, result.bid_opening);
+        assert_eq!(proof.bid_shift_opening, result.bid_shift_opening);
+        assert_eq!(proof.f_opening, result.f_opening);
+        assert_eq!(proof.r_opening, result.r_opening);
+        assert_eq!(proof.r_inv_opening, result.r_inv_opening);
+        assert_eq!(proof.diff_opening, result.diff_opening);
+        assert_eq!(proof.g_opening, result.g_opening);
+        assert_eq!(proof.q_chunk_0_cm, result.q_chunk_0_cm);
+        assert_eq!(proof.q_chunk_1_cm, result.q_chunk_1_cm);
+        assert_eq!(proof.q_chunk_0_opening, result.q_chunk_0_opening);
+        assert_eq!(proof.q_chunk_1_opening, result.q_chunk_1_opening);
+        assert_eq!(proof.w_0, result.w_0);
+        assert_eq!(proof.w_1, result.w_1);
     }
 }

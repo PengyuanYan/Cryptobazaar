@@ -182,7 +182,7 @@ where
             challenges: alphas.try_into().unwrap(),
         };
         
-        let domain = get_root_of_unity::<C1::ScalarField>((N).try_into().unwrap());
+        //let domain = get_root_of_unity::<C1::ScalarField>((N).try_into().unwrap());
         let cfg = NTTConfig::<C1::ScalarField>::default();
         //initialize_domain(domain, &NTTInitDomainConfig::default()).unwrap();
         let mut a_coeffs = vec![C1::ScalarField::zero(); witness.a.len()];
@@ -431,7 +431,7 @@ mod ipa_tests {
         let proof = InnerProduct::<N, LOG_N, Bn254CurveCfg, Bn254G2CurveCfg, Bn254PairingFieldImpl, Bn254Poly>::prove(&instance, &witness, &pk);
         let res = InnerProduct::<N, LOG_N, Bn254CurveCfg, Bn254G2CurveCfg, Bn254PairingFieldImpl, Bn254Poly>::verify(&instance, &proof, &vk, &degree_check_vk);
         
-        release_domain::<Bn254ScalarField>();
+        release_domain::<Bn254ScalarField>().unwrap();
 
         assert!(res.is_ok());
     }

@@ -13,6 +13,8 @@ use icicle_core::traits::Arithmetic;
 
 use std::collections::BTreeMap;
 
+pub mod lagrange;
+
 #[derive(Debug)]
 pub enum Error {
     PairingNot0,
