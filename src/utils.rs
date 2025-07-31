@@ -4,6 +4,7 @@ use icicle_core::polynomials::UnivariatePolynomial;
 use icicle_core::curve::Curve;
 use icicle_core::ntt::{NTTDomain, get_root_of_unity};
 use icicle_core::traits::Arithmetic;
+use icicle_runtime::{Device,runtime};
 
 pub mod folding;
 pub mod srs;
@@ -99,5 +100,19 @@ where
         }
 
         lagrange_coefficients_inverse
+    }
+}
+
+pub fn load_backend() {
+    runtime::load_backend("../cuda_backend/icicle/lib/backend").unwrap();
+    let device_gpu = Device::new("CUDA", 0);
+    let is_cuda_device_available = icicle_runtime::is_device_available(&device_gpu);
+    if is_cuda_device_available {
+        println!("gpu");
+        icicle_runtime::set_device(&device_gpu).unwrap();
+    } else {
+        println!("cpu");
+        let device_cpu = Device::new("CPU", 0);
+        icicle_runtime::set_device(&device_cpu).unwrap();
     }
 }
