@@ -1,4 +1,5 @@
-use icicle_bn254::curve::CurveCfg as Bn254CurveCfg;
+use icicle_bn254::curve::{CurveCfg as Bn254CurveCfg, G2CurveCfg as Bn254G2CurveCfg};
+use icicle_bn254::pairing::PairingTargetField as Bn254PairingFieldImpl;
 use icicle_bn254::curve::ScalarField as Bn254ScalarField;
 use icicle_core::curve::{Curve, Projective};
 use icicle_core::polynomials::UnivariatePolynomial;
@@ -7,6 +8,8 @@ use icicle_core::ntt::{ntt, NTTInitDomainConfig, NTTConfig, NTTDir, get_root_of_
 use icicle_runtime::memory::HostSlice;
 use icicle_bn254::curve::ScalarCfg;    
 use icicle_core::traits::GenerateRandom;
+use icicle_core::traits::FieldImpl;
+use std::marker::PhantomData;
 use std::ops::Mul;
 
 use cryptobazaar::kzg::{Kzg, PK, VK};

@@ -9,6 +9,8 @@ use icicle_runtime::memory::HostSlice;
 use icicle_core::traits::Arithmetic;
 use icicle_bn254::curve::ScalarCfg;    
 use icicle_core::traits::GenerateRandom;
+use icicle_core::traits::FieldImpl;
+use std::marker::PhantomData;
 use std::ops::Mul;
 
 use cryptobazaar::kzg::{Kzg, PK, VK};
@@ -57,9 +59,9 @@ fn criterion_benchmark(criterion: &mut Criterion) {
     let id = format!("proof {}", N);
     criterion.bench_function(&id, |b| {
         b.iter(|| {
-            let _ = Kzg::commit(&pk, &x_poly);//
-            //let x_vec: Vec<Projective::<Bn254CurveCfg>> = x.iter().map(|xi| g1.mul(*xi)).collect();
-            Kzg::open(&pk, &[x_poly.clone()], gamma, one)//
+            let _ = Kzg::commit(&pk, &x_poly);
+            let x_vec: Vec<Projective::<Bn254CurveCfg>> = x.iter().map(|xi| g1.mul(*xi)).collect();
+            Kzg::open(&pk, &[x_poly.clone()], gamma, one)
         })
     });
 
