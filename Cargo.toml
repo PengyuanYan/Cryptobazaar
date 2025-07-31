@@ -15,6 +15,36 @@ ark-std = "0.4"
 
 rand = "0.8.5"
 
+criterion = { version = "0.4", features = ["html_reports"] }
+
 [dev-dependencies]
 rand_chacha = "0.3.1"
+
+[[bench]]
+name = "veceq"
+harness = false
+
+[[bench]]
+name = "nonzero"
+harness = false
+
+[[bench]]
+name = "encode"
+harness = false
+
+[[bench]]
+name = "lderivative"
+harness = false
+
+[[bench]]
+name = "ipa"
+harness = false
+
+[[bench]]
+name = "auctioneer_r1"
+harness = false
+
+[[bench]]
+name = "auctioneer_r2"
+harness = false
 
