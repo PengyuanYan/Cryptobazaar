@@ -71,17 +71,17 @@ where
         let coeffs_0 = [C1::ScalarField::zero() - C1::ScalarField::one(), C1::ScalarField::one()];
         let divisor_poly_0 = P::from_coeffs(HostSlice::from_slice(&coeffs_0), 2);
         let (q_0, _) = witness.acc.divide(&divisor_poly_0);
-        let q_0 = Kzg::commit(&pk, &q_0);
+        let q_0 = Kzg::commit(&pk, &q_0).unwrap();
         
         let coeffs_1 = [C1::ScalarField::zero() - beta, C1::ScalarField::one()];
         let divisor_poly_1 = P::from_coeffs(HostSlice::from_slice(&coeffs_1), 2);
         let (q_1, _) = witness.acc.divide(&divisor_poly_1);
-        let q_1 = Kzg::commit(&pk, &q_1);
+        let q_1 = Kzg::commit(&pk, &q_1).unwrap();
 
         let coeffs_2 = [C1::ScalarField::zero() - (beta * omega), C1::ScalarField::one()];
         let divisor_poly_2 = P::from_coeffs(HostSlice::from_slice(&coeffs_2), 2);
         let (q_2, _) = witness.acc.divide(&divisor_poly_2);
-        let q_2 = Kzg::commit(&pk, &q_2);
+        let q_2 = Kzg::commit(&pk, &q_2).unwrap();
         
         Proof {
             q,
@@ -232,7 +232,7 @@ mod acc_tests {
         .unwrap();
         
         let acc_poly = Bn254DensePolynomial::from_coeffs(HostSlice::from_slice(&coeffs), n);
-        let acc_cm   = Kzg::commit(&pk, &acc_poly);
+        let acc_cm   = Kzg::commit(&pk, &acc_poly).unwrap();
 
         let instance = Instance::<Bn254CurveCfg> { n, mu, acc_cm };
 

@@ -7,7 +7,9 @@ use icicle_core::curve::{Curve,Affine};
 
 mod av_oracle;
 pub(crate) mod enums;
-
+/////////////////////////////////////////////////////////////////////////////
+// this part directly used original code
+/////////////////////////////////////////////////////////////////////////////
 #[derive(Clone)]
 pub struct Auctioneer<const N: usize, const B: usize, C: Curve + icicle_core::msm::MSM<C>> {
     state: OracleState,
@@ -69,14 +71,11 @@ impl<const N: usize, const B: usize, C: Curve + icicle_core::msm::MSM<C>> Auctio
 
         Ok(())
     }
-
+////////////
+/////////////////////////////////////////////////////////////////////////////
     pub fn output_first_round(&mut self) -> Vec<Vec<Affine::<C>>> {
         assert_eq!(self.state, OracleState::Round1Completed);
         self.state = OracleState::Round2Ongoing;
-
-        // cfg_iter_mut!(self.av_oracles)
-        //     .map(|av_i| av_i.output_first_round())
-        //     .collect()
         
         // may influence efficiency
         let mut result = Vec::new();
@@ -89,10 +88,6 @@ impl<const N: usize, const B: usize, C: Curve + icicle_core::msm::MSM<C>> Auctio
     pub fn output_second_round(&mut self) -> Vec<Affine::<C>> {
         assert_eq!(self.state, OracleState::Round2Completed);
         self.state = OracleState::Completed;
-
-        // cfg_iter_mut!(self.av_oracles)
-        //     .map(|av_i| av_i.output_second_round())
-        //     .collect()
 
         // may influence efficiency
         let mut result = Vec::new();

@@ -120,7 +120,7 @@ where
 
         let acc = U::from_coeffs(HostSlice::from_slice(&acc_coeffs), acc_coeffs.len());
 
-        let acc_cm = Kzg::commit(pk, &acc);
+        let acc_cm = Kzg::commit(pk, &acc).unwrap();
 
         /*** Sumcheck */
         let uv_instance = UVInstance::<C1> {

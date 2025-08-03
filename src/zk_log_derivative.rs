@@ -82,7 +82,7 @@ where
         //release_domain::<C1::ScalarField>().unwrap();
 
         let s = U::from_coeffs(HostSlice::from_slice(&coeffs), N);
-        let s_cm = Kzg::commit(pk, &s);
+        let s_cm = Kzg::commit(pk, &s).unwrap();
 
         VerifierIndex { s_cm: s_cm.into() }
     }
@@ -224,7 +224,7 @@ where
         .unwrap();
 
         let b = U::from_coeffs(HostSlice::from_slice(&b_coeffs), N);
-        let b_cm = Kzg::commit(pk, &b);
+        let b_cm = Kzg::commit(pk, &b).unwrap();
         
         for i in 0..N {
             b_coeffs[i] = b_coeffs[i] * twist[i];
@@ -268,7 +268,7 @@ where
         }
 
         let q = U::from_coeffs(HostSlice::from_slice(&q_coeffs), N);
-        let q_cm = Kzg::commit(pk, &q);
+        let q_cm = Kzg::commit(pk, &q).unwrap();
 
         tr.send_b_and_q(&b_cm, &q_cm);
         let mu = tr.get_mu();
@@ -286,13 +286,13 @@ where
 
         let (q_0, _) = &b.divide(&divisor_poly);
         
-        let q_0 = Kzg::commit(pk, q_0);
+        let q_0 = Kzg::commit(pk, q_0).unwrap();
         let q_1 = Kzg::open(
             pk,
             &[witness.f.clone(), index.s.clone(), b, q],
             mu,
             separation_challenge,
-        );
+        ).unwrap();
         
         //release_domain::<C1::ScalarField>().unwrap();
 
@@ -451,7 +451,7 @@ mod log_derivative_tests {
         //release_domain::<Bn254ScalarField>().unwrap();
 
         let f = Bn254Poly::from_coeffs(HostSlice::from_slice(&f_coeffs), N);
-        let f_cm = Kzg::commit(&pk, &f);
+        let f_cm = Kzg::commit(&pk, &f).unwrap();
 
         let instance = Instance::<Bn254CurveCfg> { f_cm };
 

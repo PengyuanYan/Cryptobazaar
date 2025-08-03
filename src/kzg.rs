@@ -18,6 +18,7 @@ pub mod lagrange;
 #[derive(Debug)]
 pub enum Error {
     PairingNot0,
+    SrsTooSmall { required: usize, actual: usize },
 }
 
 pub struct Kzg<C1, C2, F>
@@ -105,16 +106,15 @@ where
     pub fn commit<P>(
         pk: &PK<C1, C2, F>,
         poly: &P
-    ) -> Affine<C1> 
+    ) -> Result<Affine<C1>, Error> 
     where
         P: UnivariatePolynomial<Field = C1::ScalarField>,
     {
-        if pk.srs.len() - 1 < poly.degree().try_into().unwrap() {
-            panic!(
-                "SRS size too small! Can't commit to polynomial of degree {} with srs of size {}",
-                poly.degree(),
-                pk.srs.len()
-            );
+        let poly_degree = poly.degree().try_into().expect("Polynomial degree conversion failed");
+        let srs_len = pk.srs.len();
+
+        if poly_degree > srs_len - 1 {
+            return Err(Error::SrsTooSmall { required: srs_len - 1, actual: poly_degree });
         }
 
         let cfg = MSMConfig::default();
@@ -131,7 +131,7 @@ where
         
         let mut affine_output = Affine::<C1>::zero();
         C1::to_affine(&projective_output[0], &mut affine_output);
-        affine_output
+        Ok(affine_output)
     }
 
     pub fn open<P>(
@@ -139,7 +139,7 @@ where
         polys: &[P],
         opening_challenge: C1::ScalarField,
         separation_challenge: C1::ScalarField,
-    ) -> Affine<C1>
+    ) -> Result<Affine<C1>, Error>
     where
         P: UnivariatePolynomial<Field = C1::ScalarField>,
         <C1 as Curve>::ScalarField: Arithmetic,
@@ -162,12 +162,11 @@ where
 
         let (q, _) = batched.divide(&divisor_poly);
 
-        if pk.srs.len() - 1 < q.degree().try_into().unwrap() {
-            panic!(
-                "Batch open g1: SRS size to small! Can't commit to polynomial of degree {} with srs of size {}",
-                q.degree(),
-                pk.srs.len()
-            );
+        let q_degree = q.degree().try_into().expect("Polynomial degree conversion failed");
+        let srs_len = pk.srs.len();
+
+        if q_degree > srs_len - 1 {
+            return Err(Error::SrsTooSmall { required: srs_len - 1, actual: q_degree });
         }
 
         Kzg::commit(pk, &q)
@@ -269,13 +268,13 @@ mod test_kzg {
         
         let pk = PK::<Bn254CurveCfg, Bn254G2CurveCfg, Bn254PairingFieldImpl> { srs: srs.clone(), e: PhantomData, };
         
-        let commit = Kzg::commit(&pk, &poly);
+        let commit = Kzg::commit(&pk, &poly).unwrap();
 
         let z = Bn254ScalarField::from_u32(10u32);
         let gamma = Bn254ScalarField::from_u32(20u32);
         
         let polys = [poly.clone()];
-        let q = Kzg::open(&pk, &polys, z, gamma);
+        let q = Kzg::open(&pk, &polys, z, gamma).unwrap();
 
         let eval = poly.eval(&z);
         
@@ -304,14 +303,14 @@ mod test_kzg {
         
         let pk = PK::<Bn254CurveCfg, Bn254G2CurveCfg, Bn254PairingFieldImpl> { srs: srs.clone(), e: PhantomData, };
         
-        let a_commit = Kzg::commit(&pk, &a_poly);
-        let b_commit = Kzg::commit(&pk, &b_poly);
+        let a_commit = Kzg::commit(&pk, &a_poly).unwrap();
+        let b_commit = Kzg::commit(&pk, &b_poly).unwrap();
 
         let z = Bn254ScalarField::from_u32(10u32);
         let gamma = Bn254ScalarField::from_u32(20u32);
         
         let polys = [a_poly.clone(), b_poly.clone()];
-        let q = Kzg::open(&pk, &polys, z, gamma);
+        let q = Kzg::open(&pk, &polys, z, gamma).unwrap();
 
         let a_eval = a_poly.eval(&z);
         let b_eval = b_poly.eval(&z);
@@ -385,8 +384,8 @@ mod test_kzg {
         };
 
         let pk = PK::<Bn254CurveCfg, Bn254G2CurveCfg, Bn254PairingFieldImpl> { srs: srs.clone(), e: PhantomData, };
-        let a_cm = Kzg::commit(&pk, &a_poly);
-        let a_degree_cm = Kzg::commit(&pk, &a_degree);
+        let a_cm = Kzg::commit(&pk, &a_poly).unwrap();
+        let a_degree_cm = Kzg::commit(&pk, &a_degree).unwrap();
         
         let mut affine_output = Affine::<Bn254G2CurveCfg>::zero();
         Bn254G2CurveCfg::to_affine(degree_check_vk_map.get(&shift_factor).unwrap(), &mut affine_output);

@@ -88,8 +88,8 @@ where
         
         let r_mod_x = U::from_coeffs(HostSlice::from_slice(&r_coeffs[1..]), r_coeffs[1..].len());
 
-        let r_cm = Kzg::commit(pk, &r_mod_x);
-        let q_cm = Kzg::commit(pk, &q);
+        let r_cm = Kzg::commit(pk, &r_mod_x).unwrap();
+        let q_cm = Kzg::commit(pk, &q).unwrap();
         tr.send_r_and_q(&r_cm, &q_cm);
 
         let opening_challenge = tr.get_opening_challenge();
@@ -110,7 +110,7 @@ where
             &[witness.a_poly.clone(), witness.b_poly.clone(), r_mod_x, q],
             opening_challenge,
             separation_challenge,
-        );
+        ).unwrap();
 
         Proof {
             r_cm,
@@ -272,8 +272,8 @@ mod tests {
         
         let pk = PK::<Bn254CurveCfg, Bn254G2CurveCfg, Bn254PairingFieldImpl> { srs: srs.clone(), e: PhantomData, };
 
-        let a_cm = Kzg::commit(&pk, &a_poly);
-        let b_cm = Kzg::commit(&pk, &b_poly);
+        let a_cm = Kzg::commit(&pk, &a_poly).unwrap();
+        let b_cm = Kzg::commit(&pk, &b_poly).unwrap();
 
         let instance = Instance::<Bn254CurveCfg> { n: n as usize, a_cm, b_cm, sum };
         

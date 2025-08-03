@@ -80,7 +80,7 @@ where
         C1::to_affine(&s, &mut s_affine);
 
         let blinder = Self::sample_blinder(b_1, 1, instance.n as u64);
-        let blinder_cm = Kzg::commit(pk, &blinder);
+        let blinder_cm = Kzg::commit(pk, &blinder).unwrap();
         tr.send_blinders(&s_affine, &blinder_cm);
 
         let c = tr.get_c();
@@ -157,9 +157,9 @@ where
             U::from_coeffs(HostSlice::from_slice(&shifted_coeffs), shifted_coeffs.len())
         };
         
-        let r_mod_x_cm = Kzg::commit(pk, &r_mod_x);
-        let r_degree_cm = Kzg::commit(pk, &r_degree);
-        let q_cm = Kzg::commit(pk, &q);
+        let r_mod_x_cm = Kzg::commit(pk, &r_mod_x).unwrap();
+        let r_degree_cm = Kzg::commit(pk, &r_degree).unwrap();
+        let q_cm = Kzg::commit(pk, &q).unwrap();
         
         tr.second_round(&z_1, &z_2, &r_mod_x_cm, &r_degree_cm, &q_cm);
         let opening_challenge = tr.get_opening_challenge();
@@ -181,7 +181,7 @@ where
             &[witness.a.clone(), blinder.clone(), r_mod_x.clone(), q.clone()],
             opening_challenge,
             separation_challenge,
-        );
+        ).unwrap();
 
         Proof {
             // round 1
@@ -426,7 +426,7 @@ mod verifiable_folding_sumcheck_tests {
 
         let pedersen = Bn254CurveCfg::mul_scalar(p_base, x) + Bn254CurveCfg::mul_scalar(h_base, r);
 
-        let a_cm = Kzg::commit(&pk, &a_poly);
+        let a_cm = Kzg::commit(&pk, &a_poly).unwrap();
 
         let mut p_base_affine = Affine::<Bn254CurveCfg>::zero();
         Bn254CurveCfg::to_affine(&p_base, &mut p_base_affine);

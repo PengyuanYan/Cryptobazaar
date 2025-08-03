@@ -87,7 +87,7 @@ where
         <<C1 as Curve>::ScalarField as FieldImpl>::Config: NTTDomain<<C1 as Curve>::ScalarField> + NTT<<C1 as Curve>::ScalarField, <C1 as Curve>::ScalarField>,
     {
         let q_price = Self::make_q_price::<U>();
-        let q_price_cm = Kzg::commit(pk, &q_price);
+        let q_price_cm = Kzg::commit(pk, &q_price).unwrap();
         VerifierIndex { q_price_cm }
     }
 
@@ -118,7 +118,6 @@ where
         let cfg = NTTConfig::<C1::ScalarField>::default();
         //let domain_2n = get_root_of_unity::<C1::ScalarField>((2 * N).try_into().unwrap());
         //initialize_domain(domain_2n, &NTTInitDomainConfig::default()).unwrap();
-        
         let mut q_price_coset_evals = vec![C1::ScalarField::zero(); 2 * N];
         //domain_2n
         ntt(
@@ -186,13 +185,13 @@ where
         let mut tr = Transcript::<C1>::new(b"gates-transcript");
         tr.send_index(v_index);
 
-        let bid_cm = Kzg::commit(pk, &witness.bid);
-        let f_cm = Kzg::commit(pk, &witness.f);
-        let r_cm = Kzg::commit(pk, &witness.r);
-        let r_inv_cm = Kzg::commit(pk, &witness.r_inv);
-        let diff_cm = Kzg::commit(pk, &witness.diff);
-        let g_cm = Kzg::commit(pk, &witness.g);
-
+        let bid_cm = Kzg::commit(pk, &witness.bid).unwrap();
+        let f_cm = Kzg::commit(pk, &witness.f).unwrap();
+        let r_cm = Kzg::commit(pk, &witness.r).unwrap();
+        let r_inv_cm = Kzg::commit(pk, &witness.r_inv).unwrap();
+        let diff_cm = Kzg::commit(pk, &witness.diff).unwrap();
+        let g_cm = Kzg::commit(pk, &witness.g).unwrap();
+        
         tr.send_oracle_commitments(&bid_cm, &f_cm, &r_cm, &r_inv_cm, &diff_cm, &g_cm);
         let alpha = tr.get_quotient_challenge();
         let alpha_pows: Vec<C1::ScalarField> = std::iter::successors(Some(C1::ScalarField::one()), |p| Some(*p * alpha)).take(4).collect();
@@ -288,7 +287,7 @@ where
         for i in 0..(k * N) {
             diff_coeffs[i] = diff_coeffs[i] * twist[i];
         }
-
+        
         //domain_kn
         ntt(
             HostSlice::from_slice(&diff_coeffs),
@@ -358,7 +357,7 @@ where
             let zh_inv_i = modulus_zh_coset_evals_inv[i % k];
             q_coset_evals[i] = q_coset_evals[i] * zh_inv_i
         }
-
+        
         let mut q = vec![C1::ScalarField::zero(); q_coset_evals.len()];
         //domain_kn
         ntt(
@@ -379,8 +378,8 @@ where
         let q_chunk_0 = U::from_coeffs(HostSlice::from_slice(&q[..N]), q[..N].len());
         let q_chunk_1 = U::from_coeffs(HostSlice::from_slice(&q[N..]), q[N..].len());
 
-        let q_chunk_0_cm = Kzg::commit(pk, &q_chunk_0);
-        let q_chunk_1_cm = Kzg::commit(pk, &q_chunk_1);
+        let q_chunk_0_cm = Kzg::commit(pk, &q_chunk_0).unwrap();
+        let q_chunk_1_cm = Kzg::commit(pk, &q_chunk_1).unwrap();
 
         tr.send_q_chunks(&q_chunk_0_cm, &q_chunk_1_cm);
 
@@ -412,7 +411,7 @@ where
         );
 
         let separation_challenge = tr.get_separation_challenge();
-
+        
         let w_0 = Kzg::open(
             pk,
             &[
@@ -428,9 +427,9 @@ where
             ],
             gamma,
             separation_challenge,
-        );
+        ).unwrap();
 
-        let w_1 = Kzg::open(pk, &[witness.bid.clone()], gamma * domain_n, one);
+        let w_1 = Kzg::open(pk, &[witness.bid.clone()], gamma * domain_n, one).unwrap();
 
         Proof {
             bid_cm,
@@ -622,27 +621,27 @@ mod gates_test {
 
         let domain = get_root_of_unity::<Bn254ScalarField>((N * N).try_into().unwrap());
         initialize_domain(domain, &NTTInitDomainConfig::default()).unwrap();
-
+        
         let tau = Bn254ScalarField::from_u32(17u32);
         let srs = unsafe_setup_from_tau::<Bn254CurveCfg>(N - 1, tau);
         let x_g2 = Bn254G2CurveCfg::get_generator().mul(tau);
 
         let pk = PK::<Bn254CurveCfg, Bn254G2CurveCfg, Bn254PairingFieldImpl> { srs: srs.clone(), e: PhantomData, };
         let vk = VK::<Bn254CurveCfg, Bn254G2CurveCfg, Bn254PairingFieldImpl>::new(x_g2.into());
-
+        
         let v_index = GatesArgument::<N, P, Bn254CurveCfg, Bn254G2CurveCfg, Bn254PairingFieldImpl>::verifier_index::<Poly>(&pk);
         let p_index = GatesArgument::<N, P, Bn254CurveCfg, Bn254G2CurveCfg, Bn254PairingFieldImpl>::prover_index::<Poly>();
-
+        
         let bid = 9;
         let enc = BidEncoder::<P, N, Bn254CurveCfg>::encode::<ChaCha20Rng>(bid, SEED);
         
         let witness= enc.to_gate_witness::<ChaCha20Rng, Poly>(SEED);
-
+        
         let proof = GatesArgument::<N, P, Bn254CurveCfg, Bn254G2CurveCfg, Bn254PairingFieldImpl>::prove(&witness, &v_index, &p_index, &pk);
         let result = GatesArgument::<N, P, Bn254CurveCfg, Bn254G2CurveCfg, Bn254PairingFieldImpl>::verify(&v_index, &proof, &vk);
-
+        
         release_domain::<Bn254ScalarField>().unwrap();
-
+        
         assert!(result.is_ok());
     }
 }
