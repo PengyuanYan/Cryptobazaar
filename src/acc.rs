@@ -56,14 +56,15 @@ where
         let p = C1::ScalarField::from_u32(5u32);
         debug_assert!((0..n).all(|i| p != omega.pow(i)), "p must not be in the domain");
 
-        let acc_sh = witness.acc.eval(&(p * omega));
-        let acc = witness.acc.eval(&p);
-        let zh_eval = p.pow(n) - C1::ScalarField::one();
-        
-        let q = {
-            let lhs = (acc_sh - instance.mu * acc) * (p - omega.pow(n - 1));
-            lhs * zh_eval.inv()
-        };
+        let acc_eval = witness.acc.eval(&p);
+        let acc_shifted_eval = witness.acc.eval(&(p * omega));
+        let zh_at_p = p.pow(n) - C1::ScalarField::one();
+        let numerator = (acc_shifted_eval - instance.mu * acc_eval) * (p - omega.pow(n - 1));
+        let denominator_inv = zh_at_p.inv();
+
+        // q = ((acc_shifted - μ * acc) * (p - ω^(n - 1))) / Z_H(p)
+        //   = numerator / vanishing_polynomial_at_p
+        let q = numerator * denominator_inv;
         
         tr.send_q(&q);
         let beta = tr.get_beta();
@@ -148,14 +149,12 @@ where
             return Err(Error::OpeningFailed);
         }
 
-        let zh_eval = beta.pow(n) - C1::ScalarField::one();
-        let eq = {
-            (proof.acc_shifted_opening - instance.mu * proof.acc_opening)
-                * (beta - omega.pow(instance.n - 1))
-                == proof.q * zh_eval
-        };
+        let zh_at_beta = beta.pow(n) - C1::ScalarField::one();
+        let lhs = (proof.acc_shifted_opening - instance.mu * proof.acc_opening)
+                      * (beta - omega.pow(n - 1));
+        let rhs = proof.q * zh_at_beta;
 
-        if !eq {
+        if lhs != rhs {
             return Err(Error::RelationCheck);
         }
 
