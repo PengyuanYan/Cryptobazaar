@@ -121,11 +121,6 @@ where
             let b2_left = &b2_folded[..b2_folded.len() / 2];
             let b2_right = &b2_folded[b2_folded.len() / 2..];
 
-            assert_eq!(a_left.len(), b1_right.len());
-            assert_eq!(a_left.len(), b2_right.len());
-            assert_eq!(a_right.len(), b1_left.len());
-            assert_eq!(a_right.len(), b2_left.len());
-
             if a_left.len() != b1_right.len() ||
                a_left.len() != b2_right.len() ||
 
