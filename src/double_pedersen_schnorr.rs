@@ -46,15 +46,19 @@ impl<C: Curve> Argument<C> {
     {
         let mut tr = Transcript::<C>::new(b"pedersen-schnorr");
         tr.send_instance(instance);
+        
+        let random_scalars = <<C::ScalarField as FieldImpl>::Config as GenerateRandom<C::ScalarField>>::generate_random(3);
+        let b_1 = random_scalars[0];
+        let b_2 = random_scalars[1];
+        let b_3 = random_scalars[2];
 
-        let (b_1, b_2, b_3) = (
-            <<C::ScalarField as FieldImpl>::Config as GenerateRandom<C::ScalarField>>::generate_random(1)[0],
-            <<C::ScalarField as FieldImpl>::Config as GenerateRandom<C::ScalarField>>::generate_random(1)[0],
-            <<C::ScalarField as FieldImpl>::Config as GenerateRandom<C::ScalarField>>::generate_random(1)[0],
-        );
+        let q_term = C::mul_scalar(instance.q_base.to_projective(), b_1);
+        let h_term = C::mul_scalar(instance.h_base.to_projective(), b_2);
+        let rand_1 = q_term + h_term;
 
-        let rand_1 = C::mul_scalar(instance.q_base.to_projective(), b_1) + C::mul_scalar(instance.h_base.to_projective(), b_2);
-        let rand_2 = C::mul_scalar(instance.p_base.to_projective(), b_1) + C::mul_scalar(instance.h_base.to_projective(), b_3);
+        let p_term = C::mul_scalar(instance.p_base.to_projective(), b_1);
+        let h_term = C::mul_scalar(instance.h_base.to_projective(), b_3);
+        let rand_2 = p_term + h_term;
         
         let mut rand_1_affine = Affine::<C>::zero();
         C::to_affine(&rand_1, &mut rand_1_affine);

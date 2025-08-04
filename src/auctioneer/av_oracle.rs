@@ -5,6 +5,8 @@ use super::enums::{AVError, OracleState};
 use icicle_core::{msm, msm::MSMConfig};
 use icicle_runtime::memory::HostSlice;
 
+/////////////////////////////////////////////////////////////////////////////
+// This part directly uses the original code to ensure compatibility.
 #[derive(Clone)]
 pub struct AVOracle<const B: usize, C: Curve> {
     state: OracleState,
@@ -92,12 +94,15 @@ impl<const B: usize, C: Curve + icicle_core::msm::MSM<C>> AVOracle<B, C> {
 
         Ok(())
     }
-
+////////////
+/////////////////////////////////////////////////////////////////////////////
     pub fn output_first_round(&mut self) -> Vec<Affine::<C>> {
         assert_eq!(self.state, OracleState::Round1Completed);
 
-        let mut x = [C::ScalarField::one(); B];
-        x[B - 1] = C::ScalarField::zero();
+        let mut x: Vec<C::ScalarField> = (0..B)
+            .map(|i| if i == B - 1 { C::ScalarField::zero() }
+                     else { C::ScalarField::one() })
+        .collect();
 
         let mut outputs = vec![Affine::<C>::zero(); B];
 
@@ -173,7 +178,6 @@ mod av_oracle_tests {
     use icicle_bn254::curve::ScalarCfg;
 
     #[test]
-    #[ignore]
     fn no_veto() {
         let g = Bn254CurveCfg::get_generator();
 
@@ -208,7 +212,6 @@ mod av_oracle_tests {
     }
 
     #[test]
-    #[ignore]
     fn veto() {
         let g = Bn254CurveCfg::get_generator();
 

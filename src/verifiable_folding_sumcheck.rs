@@ -292,10 +292,14 @@ where
         let lhs = proof.blinder_opening + c * proof.a_opening * b_opening;
 
         let rhs = {
-            let n_inv = C1::ScalarField::from_u32(instance.n as u32).inv();
-            opening_challenge * proof.r_opening
-                + proof.z_1 * n_inv
-                + proof.q_opening * (opening_challenge.pow(instance.n) - C1::ScalarField::one())
+            let n = C1::ScalarField::from_u32(instance.n as u32);
+            let n_inv = n.inv();
+
+            let term1 = opening_challenge * proof.r_opening;
+            let term2 = proof.z_1 * n_inv;
+            let term3 = proof.q_opening * (opening_challenge.pow(instance.n) - C1::ScalarField::one());
+
+            term1 + term2 + term3
         };
         
         if lhs != rhs {

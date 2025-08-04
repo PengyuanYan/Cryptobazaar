@@ -43,9 +43,13 @@ impl<C: Curve> Argument<C> {
         let mut tr = Transcript::<C>::new(b"pedersen-schnorr");
         tr.send_instance(instance);
         
-        let (b_1, b_2) = (<<C::ScalarField as FieldImpl>::Config as GenerateRandom<C::ScalarField>>::generate_random(1)[0], <<C::ScalarField as FieldImpl>::Config as GenerateRandom<C::ScalarField>>::generate_random(1)[0]);
+        let random_scalars = <<C::ScalarField as FieldImpl>::Config as GenerateRandom<C::ScalarField>>::generate_random(2);
+        let b_1 = random_scalars[0];
+        let b_2 = random_scalars[1];
 
-        let blinder = C::mul_scalar(instance.p_base.to_projective(), b_1) + C::mul_scalar(instance.h_base.to_projective(), b_2);
+        let p_term = C::mul_scalar(instance.p_base.to_projective(), b_1);
+        let h_term = C::mul_scalar(instance.h_base.to_projective(), b_2);
+        let blinder = p_term + h_term;
         
         let mut blinder_affine = Affine::<C>::zero();
         C::to_affine(&blinder, &mut blinder_affine);
@@ -79,9 +83,7 @@ impl<C: Curve> Argument<C> {
         let h_z_2 = C::mul_scalar(h_base_projective, proof.z_2);
         let rhs = p_z_1 + h_z_2;
 
-        let eq = { lhs == rhs };
-
-        if !eq {
+        if lhs != rhs {
             return Err(Error::RelationCheckFailed);
         }
 

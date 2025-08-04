@@ -8,8 +8,7 @@ use icicle_core::curve::{Curve,Affine};
 mod av_oracle;
 pub(crate) mod enums;
 /////////////////////////////////////////////////////////////////////////////
-// this part directly used original code
-/////////////////////////////////////////////////////////////////////////////
+// This part directly uses the original code to ensure compatibility.
 #[derive(Clone)]
 pub struct Auctioneer<const N: usize, const B: usize, C: Curve + icicle_core::msm::MSM<C>> {
     state: OracleState,

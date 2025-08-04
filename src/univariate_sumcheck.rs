@@ -176,10 +176,14 @@ where
 
         // check sumcheck relation
         let rhs = {
-            let n_inv = C1::ScalarField::from_u32((instance.n).try_into().unwrap()).inv();
-            opening_challenge * proof.r_opening
-                + instance.sum * n_inv
-                + proof.q_opening * (opening_challenge.pow(instance.n) - C1::ScalarField::one())
+            let n = C1::ScalarField::from_u32((instance.n).try_into().unwrap());
+            let n_inv = n.inv();
+
+            let term1 = opening_challenge * proof.r_opening;
+            let term2 = instance.sum * n_inv;
+            let term3 = proof.q_opening * (opening_challenge.pow(instance.n) - C1::ScalarField::one());
+
+            term1 + term2 + term3
         };
 
         assert_eq!(lhs, rhs); //sometimes may fail

@@ -26,6 +26,15 @@ use self::{
 pub mod structs;
 mod tr;
 
+#[derive(Debug)]
+pub enum Error {
+    FoldShapeMismatch { round: usize, a_left: usize, b1_right: usize, b2_right: usize,
+                                      a_right: usize, b1_left: usize, b2_left: usize
+                      },
+    FoldWrongLength { a_len: usize, b1_len: usize, b2_len: usize },
+    SanityMismatch { position: usize },
+}
+
 pub struct DoubleInnerProduct<const N: usize, const LOG_N: usize, C1, C2, F, U>
 where
     C1: Curve,
@@ -49,7 +58,7 @@ where
         instance: &Instance<N, C1>,
         witness: &Witness<N, C1>,
         pk: &KzgPk<C1, C2, F>,
-    ) -> Proof<LOG_N, C1>
+    ) -> Result<Proof<LOG_N, C1>, Error>
     where
         <C1 as Curve>::ScalarField: Arithmetic,
         <<C1 as Curve>::ScalarField as FieldImpl>::Config: GenerateRandom<<C1 as Curve>::ScalarField>,
@@ -102,7 +111,7 @@ where
             b2_folded.push(result_affine);
         }
         
-        for _ in 0..LOG_N as usize {
+        for round in 0..LOG_N as usize {
             let a_left = &a_folded[..a_folded.len() / 2];
             let a_right = &a_folded[a_folded.len() / 2..];
 
@@ -116,6 +125,24 @@ where
             assert_eq!(a_left.len(), b2_right.len());
             assert_eq!(a_right.len(), b1_left.len());
             assert_eq!(a_right.len(), b2_left.len());
+
+            if a_left.len() != b1_right.len() ||
+               a_left.len() != b2_right.len() ||
+
+               a_right.len() != b1_left.len() ||
+               a_right.len() != b2_left.len()
+            {
+                return Err(Error::FoldShapeMismatch {
+                    round: round,
+                    a_left: a_left.len(),
+                    b1_right: b1_right.len(),
+                    b2_right: b2_right.len(),
+
+                    a_right: a_right.len(),
+                    b1_left: b1_left.len(),
+                    b2_left: b2_left.len(),
+                });
+            }
 
             let l_1 = if a_left.len() == 1 { 
                 C1::mul_scalar(b1_right[0].to_projective(), a_left[0])
@@ -173,11 +200,12 @@ where
                 buf[0]
             };
 
-            let blinder_l1 = <<C1::ScalarField as FieldImpl>::Config as GenerateRandom<C1::ScalarField>>::generate_random(1)[0];
-            let blinder_r1 = <<C1::ScalarField as FieldImpl>::Config as GenerateRandom<C1::ScalarField>>::generate_random(1)[0];
+            let blinders = <<C1::ScalarField as FieldImpl>::Config as GenerateRandom<C1::ScalarField>>::generate_random(4);
+            let blinder_l1 = blinders[0];
+            let blinder_r1 = blinders[1];
 
-            let blinder_l2 = <<C1::ScalarField as FieldImpl>::Config as GenerateRandom<C1::ScalarField>>::generate_random(1)[0];
-            let blinder_r2 = <<C1::ScalarField as FieldImpl>::Config as GenerateRandom<C1::ScalarField>>::generate_random(1)[0];
+            let blinder_l2 = blinders[2];
+            let blinder_r2 = blinders[3];
 
             let l_1_projective = l_1 + C1::mul_scalar(instance.h_base.to_projective(), blinder_l1);
             let mut l_1_affine = Affine::<C1>::zero();
@@ -218,17 +246,32 @@ where
         }
         
         // sanity
+        if a_folded.len() != 1 || 
+           b1_folded.len() != 1 ||
+           b2_folded.len() != 1
         {
-            assert_eq!(b1_folded.len(), 1);
-            assert_eq!(b2_folded.len(), 1);
+            return Err(Error::FoldWrongLength {
+                a_len: a_folded.len(),
+                b1_len: b1_folded.len(),
+                b2_len: b2_folded.len(),
+            });
+        }
 
-            assert_eq!(a_folded.len(), 1);
+        let lhs_1 = C1::mul_scalar(b1_folded[0].to_projective(), a_folded[0])
+                  + C1::mul_scalar(instance.h_base.to_projective(), acc_blinders_1);
+        let lhs_2 = C1::mul_scalar(b2_folded[0].to_projective(), a_folded[0])
+                  + C1::mul_scalar(instance.h_base.to_projective(), acc_blinders_2);
 
-            let lhs_1 = C1::mul_scalar(b1_folded[0].to_projective(), a_folded[0]) + C1::mul_scalar(instance.h_base.to_projective(), acc_blinders_1);
-            let lhs_2 = C1::mul_scalar(b2_folded[0].to_projective(), a_folded[0]) + C1::mul_scalar(instance.h_base.to_projective(), acc_blinders_2);
+        if lhs_1 != c1_fold_projective {
+            return Err(Error::SanityMismatch {
+                position: 1usize
+            });
+        }
 
-            assert_eq!(lhs_1, c1_fold_projective);
-            assert_eq!(lhs_2, c2_fold_projective);
+        if lhs_2 != c2_fold_projective {
+            return Err(Error::SanityMismatch {
+                position: 2usize
+            });
         }
         
         let mut c1_fold_affine = Affine::<C1>::zero();
@@ -259,14 +302,14 @@ where
         
         let lf_proof = LFArgument::<N, LOG_N, C1, C2, F, U>::prove(pk, &lf_instance);
         
-        Proof::<LOG_N, C1> {
+        Ok(Proof::<LOG_N, C1> {
             l_1: l_1_msgs.try_into().unwrap(),
             r_1: r_1_msgs.try_into().unwrap(),
             l_2: l_2_msgs.try_into().unwrap(),
             r_2: r_2_msgs.try_into().unwrap(),
             lf_proof,
             ps_proof,
-        }
+        })
     }
 
     pub fn verify(
@@ -468,7 +511,7 @@ mod double_ipa_tests {
         };
         
         let proof =
-            DoubleInnerProduct::<N, LOG_N, Bn254CurveCfg, Bn254G2CurveCfg, Bn254PairingFieldImpl, Bn254Poly>::prove(&instance, &witness, &pk);
+            DoubleInnerProduct::<N, LOG_N, Bn254CurveCfg, Bn254G2CurveCfg, Bn254PairingFieldImpl, Bn254Poly>::prove(&instance, &witness, &pk).unwrap();
         
         DoubleInnerProduct::<N, LOG_N, Bn254CurveCfg, Bn254G2CurveCfg, Bn254PairingFieldImpl, Bn254Poly>::verify(&instance, &proof, &vk);
 
