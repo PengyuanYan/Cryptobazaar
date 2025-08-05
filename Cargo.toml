@@ -48,3 +48,7 @@ harness = false
 name = "auctioneer_r2"
 harness = false
 
+[[bench]]
+name = "msmbenchmark"
+harness = false
+
