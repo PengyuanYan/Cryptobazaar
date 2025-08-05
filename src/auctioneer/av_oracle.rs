@@ -96,7 +96,7 @@ impl<const B: usize, C: Curve + icicle_core::msm::MSM<C>> AVOracle<B, C> {
     }
 ////////////
 /////////////////////////////////////////////////////////////////////////////
-    pub fn output_first_round(&mut self) -> Vec<Affine::<C>> {
+    pub fn output_first_round(&mut self) -> Vec<Projective::<C>> {
         assert_eq!(self.state, OracleState::Round1Completed);
 
         let mut x: Vec<C::ScalarField> = (0..B)
@@ -104,7 +104,7 @@ impl<const B: usize, C: Curve + icicle_core::msm::MSM<C>> AVOracle<B, C> {
                      else { C::ScalarField::one() })
         .collect();
 
-        let mut outputs = vec![Affine::<C>::zero(); B];
+        let mut outputs = vec![Projective::<C>::zero(); B];
 
         let cfg = MSMConfig::default();
         let mut projective_output = vec![Projective::<C>::zero(); 1];
@@ -117,10 +117,10 @@ impl<const B: usize, C: Curve + icicle_core::msm::MSM<C>> AVOracle<B, C> {
         )
         .unwrap();
 
-        let mut affine_output = Affine::<C>::zero();
-        C::to_affine(&projective_output[0], &mut affine_output);
+        //let mut affine_output = Affine::<C>::zero();
+        //C::to_affine(&projective_output[0], &mut affine_output);
 
-        outputs[B-1] = affine_output;
+        outputs[B-1] = projective_output[0];//affine_output;
 
         /*
            0 -1 -1 -1
@@ -130,10 +130,10 @@ impl<const B: usize, C: Curve + icicle_core::msm::MSM<C>> AVOracle<B, C> {
         */
         for i in 0..(B - 1) {
             let idx = B - 2 - i;
-            let projective_output = outputs[idx + 1].to_projective() - self.first_msgs[idx + 1].to_projective() - self.first_msgs[idx].to_projective();
-            let mut affine_output = Affine::<C>::zero();
-            C::to_affine(&projective_output, &mut affine_output);
-            outputs[idx] = affine_output;
+            let projective_output = outputs[idx + 1] - self.first_msgs[idx + 1].to_projective() - self.first_msgs[idx].to_projective();
+            // let mut affine_output = Affine::<C>::zero();
+            // C::to_affine(&projective_output, &mut affine_output);
+            outputs[idx] = projective_output;// affine_output;
         }
 
         self.state = OracleState::Round2Ongoing;

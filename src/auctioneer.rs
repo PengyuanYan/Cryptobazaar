@@ -3,7 +3,7 @@ use self::{
     enums::{AVError, OracleState},
 };
 
-use icicle_core::curve::{Curve,Affine};
+use icicle_core::curve::{Curve,Affine,Projective};
 
 mod av_oracle;
 pub(crate) mod enums;
@@ -72,7 +72,7 @@ impl<const N: usize, const B: usize, C: Curve + icicle_core::msm::MSM<C>> Auctio
     }
 ////////////
 /////////////////////////////////////////////////////////////////////////////
-    pub fn output_first_round(&mut self) -> Vec<Vec<Affine::<C>>> {
+    pub fn output_first_round(&mut self) -> Vec<Vec<Projective::<C>>> {
         assert_eq!(self.state, OracleState::Round1Completed);
         self.state = OracleState::Round2Ongoing;
         
