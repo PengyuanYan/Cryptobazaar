@@ -9,6 +9,8 @@ use std::ops::Mul;
 use cryptobazaar::auctioneer::Auctioneer;
 use criterion::{criterion_group, criterion_main, Criterion};
 
+use cryptobazaar::utils::load_backend;
+
 /* RUN WITH: cargo bench --bench auctioneer_r1 */
 
 fn setup_round_2<const N: usize, const B: usize>() -> Auctioneer<N, B, Bn254CurveCfg> {
@@ -47,7 +49,7 @@ fn setup_round_2<const N: usize, const B: usize>() -> Auctioneer<N, B, Bn254Curv
     let mut second_msgs = vec![vec![Affine::<Bn254CurveCfg>::zero(); N]; B];
     for i in 0..B {
         for j in 0..N {
-            let projective_result = fr_result[j][i].to_projective().mul(secrets[i][j]);
+            let projective_result = fr_result[j][i].mul(secrets[i][j]);
             let mut affine_result = Affine::<Bn254CurveCfg>::zero();
             Bn254CurveCfg::to_affine(&projective_result, &mut affine_result);
             second_msgs[i][j] = affine_result;
@@ -70,8 +72,8 @@ fn bench_second_round<const N: usize, const B: usize>(
 }
 
 fn round_2(c: &mut Criterion) {
-    const N: usize = 32;
-    const B: usize = 32;
+    const N: usize = 1024;
+    const B: usize = 128;
 
     let a = setup_round_2::<N, B>();
     let id = format!("Round2: range = {}, bidders = {}", N, B);
@@ -79,6 +81,7 @@ fn round_2(c: &mut Criterion) {
 }
 
 fn criterion_benchmark(c: &mut Criterion) {
+    load_backend();
     round_2(c);
 }
 

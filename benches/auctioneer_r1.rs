@@ -25,21 +25,21 @@ fn setup_round_1<const N: usize, const B: usize>() -> Auctioneer<N, B, Bn254Curv
                  y: <Bn254CurveCfg as Curve>::BaseField::one(),
     };
     
-    // initialize n msgs fro each party
+    // initialize n msgs for each party
     for i in 0..B {
+        let generated_secrets = ScalarCfg::generate_random(N);
         for j in 0..N {
-            secrets[i][j] = ScalarCfg::generate_random(1)[0];
+            secrets[i][j] = generated_secrets[j];
         }
     }
 
-    // initialize n msgs fro each party
+    // initialize n msgs for each party
     for i in 0..B {
         for j in 0..N {
-            let projective_result = Bn254CurveCfg::generate_random_projective_points(1)[0];//g.mul(secrets[i][j]);
+            let projective_result = g.mul(secrets[i][j]);
             let mut affine_result = Affine::<Bn254CurveCfg>::zero();
             Bn254CurveCfg::to_affine(&projective_result, &mut affine_result);
-            first_msgs[i][j] = Bn254CurveCfg::generate_random_affine_points(1)[0];//affine_result;
-            first_msgs[i][j] = fake;
+            first_msgs[i][j] = affine_result;
         }
     }
 
@@ -53,14 +53,14 @@ fn setup_round_1<const N: usize, const B: usize>() -> Auctioneer<N, B, Bn254Curv
 
 fn bench_first_round<const N: usize, const B: usize>(
     a: Auctioneer<N, B, Bn254CurveCfg>,
-) -> Vec<Vec<Affine::<Bn254CurveCfg>>> {
+) -> Vec<Vec<Projective::<Bn254CurveCfg>>> {
     let mut a_clone = a.clone();
     a_clone.output_first_round()
 }
 
 fn round_1(c: &mut Criterion) {
     const N: usize = 1024;
-    const B: usize = 32;
+    const B: usize = 128;
 
     let a = setup_round_1::<N, B>();
     let id = format!("Round1: range = {}, bidders = {}", N, B);
@@ -68,6 +68,7 @@ fn round_1(c: &mut Criterion) {
 }
 
 fn criterion_benchmark(c: &mut Criterion) {
+    load_backend();
     round_1(c);
 }
 
