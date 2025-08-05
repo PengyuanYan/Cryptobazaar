@@ -104,7 +104,7 @@ where
 }
 
 pub fn load_backend() {
-    runtime::load_backend("../cuda_backend/icicle/lib/backend").unwrap();
+    runtime::load_backend_from_env_or_default().unwrap();
     let device_gpu = Device::new("CUDA", 0);
     let is_cuda_device_available = icicle_runtime::is_device_available(&device_gpu);
     if is_cuda_device_available {
