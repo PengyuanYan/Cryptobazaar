@@ -60,3 +60,6 @@ harness = false
 name = "testparts"
 harness = false
 
+[[bench]]
+name = "nttbenchmark"
+harness = false
