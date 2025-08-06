@@ -52,3 +52,11 @@ harness = false
 name = "msmbenchmark"
 harness = false
 
+[[bench]]
+name = "convertbenchmark"
+harness = false
+
+[[bench]]
+name = "testparts"
+harness = false
+
