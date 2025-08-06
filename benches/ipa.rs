@@ -28,13 +28,14 @@ use criterion::{criterion_group, criterion_main, Criterion};
 
 /* RUN WITH: cargo bench --bench ipa */
 
-const N: usize = 8192;
-const LOG_N: usize = 13;
+const N: usize = 1024;
+const LOG_N: usize = 10;
 
 fn prove<const N: usize, C1, C2, F, U>(
     instance: &Instance<N, C1>,
     witness: &Witness<N, C1>,
     pk: &PK<C1, C2, F>,
+    cpu_or_gpu: usize
 ) 
 where
     C1: Curve + icicle_core::msm::MSM<C1>,
@@ -47,11 +48,11 @@ where
     <U as UnivariatePolynomial>::FieldConfig: GenerateRandom<<C1 as Curve>::ScalarField>,
     <<C1 as Curve>::ScalarField as FieldImpl>::Config: GenerateRandom<<C1 as Curve>::ScalarField>
 {
-    InnerProduct::<N, LOG_N, C1, C2, F, U>::prove(instance, witness, pk);
+    InnerProduct::<N, LOG_N, C1, C2, F, U>::prove(instance, witness, pk, cpu_or_gpu);
 }
 
 fn criterion_benchmark(criterion: &mut Criterion) {
-    load_backend();
+    let cpu_or_gpu = load_backend();
 
     let domain = get_root_of_unity::<Bn254ScalarField>((N * N).try_into().unwrap());
     initialize_domain(domain, &NTTInitDomainConfig::default()).unwrap();
@@ -116,7 +117,7 @@ fn criterion_benchmark(criterion: &mut Criterion) {
 
     let id = format!("proof {}", N);
     criterion.bench_function(&id, |b| {
-        b.iter(|| prove::<N, Bn254CurveCfg, Bn254G2CurveCfg, Bn254PairingFieldImpl, Bn254Poly>(&instance, &witness, &pk))
+        b.iter(|| prove::<N, Bn254CurveCfg, Bn254G2CurveCfg, Bn254PairingFieldImpl, Bn254Poly>(&instance, &witness, &pk, cpu_or_gpu))
     });
 
     release_domain::<Bn254ScalarField>().unwrap();

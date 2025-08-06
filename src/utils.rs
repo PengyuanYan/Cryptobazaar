@@ -1,10 +1,12 @@
-use icicle_runtime::memory::HostSlice;
 use icicle_core::traits::FieldImpl;
 use icicle_core::polynomials::UnivariatePolynomial;
-use icicle_core::curve::Curve;
-use icicle_core::ntt::{NTTDomain, get_root_of_unity};
+use icicle_core::ntt::{ntt, NTTInitDomainConfig, NTTConfig, NTTDir, get_root_of_unity, NTTDomain, NTT};
 use icicle_core::traits::Arithmetic;
 use icicle_runtime::{Device,runtime};
+
+use icicle_core::curve::{Curve, Projective, Affine};
+use icicle_core::{msm, msm::MSMConfig};
+use icicle_runtime::memory::{DeviceVec, HostSlice};
 
 pub mod folding;
 pub mod srs;
@@ -103,16 +105,88 @@ where
     }
 }
 
-pub fn load_backend() {
-    runtime::load_backend_from_env_or_default().unwrap();
+pub fn load_backend() -> usize{
+    //runtime::load_backend_from_env_or_default().unwrap();
     let device_gpu = Device::new("CUDA", 0);
     let is_cuda_device_available = icicle_runtime::is_device_available(&device_gpu);
     if is_cuda_device_available {
         println!("gpu");
         icicle_runtime::set_device(&device_gpu).unwrap();
+        return 1;
     } else {
         println!("cpu");
         let device_cpu = Device::new("CPU", 0);
         icicle_runtime::set_device(&device_cpu).unwrap();
+        return 0;
     }
+}
+
+pub fn msm_gpu<C: Curve + icicle_core::msm::MSM<C>>(scalars: &[C::ScalarField], bases: &[Affine::<C>]) -> Projective::<C> {
+    assert_eq!(scalars.len(), bases.len());
+    
+    let cfg = MSMConfig::default();
+    let n: usize = scalars.len();
+    let mut output_cpu = vec![Projective::<C>::zero(); 1];
+
+    let mut input_scalars_gpu =
+        DeviceVec::<C::ScalarField>::device_malloc(n).expect("Failed to allocate device memory for scalars input");
+    let mut input_bases_gpu =
+        DeviceVec::<Affine::<C>>::device_malloc(n).expect("Failed to allocate device memory for bases input");
+    let mut output_gpu =
+        DeviceVec::<Projective::<C>>::device_malloc(1).expect("Failed to allocate device memory for msm output");
+    
+    input_scalars_gpu
+        .copy_from_host(HostSlice::from_slice(&scalars))
+        .expect("Failed to copy scalars data to GPU");
+    input_bases_gpu
+        .copy_from_host(HostSlice::from_slice(&bases))
+        .expect("Failed to copy bases data to GPU");
+
+    unsafe{
+        msm::msm(
+            &input_scalars_gpu[..],
+            &input_bases_gpu[..],
+            &cfg,
+            &mut output_gpu[..],
+        )
+        .unwrap();
+    }
+
+    output_gpu
+        .copy_to_host(HostSlice::from_mut_slice(&mut output_cpu))
+        .expect("Failed to copy result data back to CPU");
+    
+    output_cpu[0]
+}
+
+pub fn ntt_gpu<C: Curve>(scalars: &[C::ScalarField], coset_generator: &C::ScalarField, direction: NTTDir) -> Vec<C::ScalarField>
+where
+    <<C as Curve>::ScalarField as FieldImpl>::Config: NTT<<C as Curve>::ScalarField, <C as Curve>::ScalarField>
+{
+    let mut cfg = NTTConfig::<C::ScalarField>::default();
+    cfg.coset_gen = *coset_generator;
+    let n = scalars.len();
+
+    let mut input_gpu =
+        DeviceVec::<C::ScalarField>::device_malloc(n).expect("Failed to allocate device memory for ntt input");
+    let mut output_gpu =
+        DeviceVec::<C::ScalarField>::device_malloc(n).expect("Failed to allocate device memory for ntt output");
+    input_gpu
+        .copy_from_host(HostSlice::from_slice(&scalars))
+        .expect("Failed to copy ntt input data to GPU");
+    
+    let mut coeffs = vec![C::ScalarField::zero(); n];
+    ntt(
+        &input_gpu[..],
+        direction,
+        &cfg,
+        &mut output_gpu[..],
+    )
+    .unwrap();
+
+    output_gpu
+        .copy_to_host(HostSlice::from_mut_slice(&mut coeffs))
+        .expect("Failed to copy ntt result data back to CPU");
+
+    coeffs
 }
