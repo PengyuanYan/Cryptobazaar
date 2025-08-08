@@ -25,7 +25,7 @@ use criterion::{criterion_group, criterion_main, Criterion};
 
 /* RUN WITH: cargo bench --bench lderivative */
 
-const N: usize = 8192;
+const N: usize = 1024;
 const B: usize = 1;
 
 fn prove<const N: usize, C1, C2, F, P>(
@@ -83,7 +83,7 @@ fn criterion_benchmark(criterion: &mut Criterion) {
     .unwrap();
 
     let f = Bn254Poly::from_coeffs(HostSlice::from_slice(&f_coeffs), N);
-    let f_cm = Kzg::commit(&pk, &f);
+    let f_cm = Kzg::commit(&pk, &f).unwrap();
 
     let instance = Instance::<Bn254CurveCfg> { f_cm };
 

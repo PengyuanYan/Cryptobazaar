@@ -59,9 +59,9 @@ fn criterion_benchmark(criterion: &mut Criterion) {
     let id = format!("proof {}", N);
     criterion.bench_function(&id, |b| {
         b.iter(|| {
-            let _ = Kzg::commit(&pk, &x_poly);
+            //let _ = Kzg::commit(&pk, &x_poly);
             let x_vec: Vec<Projective::<Bn254CurveCfg>> = x.iter().map(|xi| g1.mul(*xi)).collect();
-            Kzg::open(&pk, &[x_poly.clone()], gamma, one)
+            //Kzg::open(&pk, &[x_poly.clone()], gamma, one)
         })
     });
 

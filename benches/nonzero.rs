@@ -49,12 +49,6 @@ fn criterion_benchmark(criterion: &mut Criterion) {
     .unwrap();
     let x_poly = Bn254Poly::from_coeffs(HostSlice::from_slice(&x_coeffs), x_coeffs.len());
 
-    // let a_cm = Kzg::commit(&pk, &x_poly);
-    // let gamma = F::rand(&mut rng);
-    // let one = F::from(1u64);
-    // let g1 = G1Projective::generator();
-    // let x_vec: Vec<G1Affine> = x.iter().map(|xi| g1.mul(xi).into()).collect();
-
     let id = format!("proof {}", N);
     criterion.bench_function(&id, |b| {
         b.iter(|| {
@@ -85,7 +79,6 @@ fn criterion_benchmark(criterion: &mut Criterion) {
             let _ = Kzg::commit(&pk, &x_poly);
 
             let x = ScalarCfg::generate_random(N);
-            let cfg = NTTConfig::<Bn254ScalarField>::default();
             let mut x_coeffs = vec![Bn254ScalarField::zero(); N];
             ntt(
                 HostSlice::from_slice(&x),
@@ -98,7 +91,6 @@ fn criterion_benchmark(criterion: &mut Criterion) {
             let _ = Kzg::commit(&pk, &x_poly);
 
             let x = ScalarCfg::generate_random(N);
-            let cfg = NTTConfig::<Bn254ScalarField>::default();
             let mut x_coeffs = vec![Bn254ScalarField::zero(); N];
             ntt(
                 HostSlice::from_slice(&x),
@@ -111,7 +103,6 @@ fn criterion_benchmark(criterion: &mut Criterion) {
             let _ = Kzg::commit(&pk, &x_poly);
 
             let x = ScalarCfg::generate_random(N);
-            let cfg = NTTConfig::<Bn254ScalarField>::default();
             let mut x_coeffs = vec![Bn254ScalarField::zero(); N];
             ntt(
                 HostSlice::from_slice(&x),
@@ -124,7 +115,6 @@ fn criterion_benchmark(criterion: &mut Criterion) {
             let _ = Kzg::commit(&pk, &x_poly);
 
             let x = ScalarCfg::generate_random(N);
-            let cfg = NTTConfig::<Bn254ScalarField>::default();
             let mut x_coeffs = vec![Bn254ScalarField::zero(); N];
             ntt(
                 HostSlice::from_slice(&x),

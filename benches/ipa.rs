@@ -22,14 +22,14 @@ use cryptobazaar::{
     },
     kzg::PK,
     utils::srs::unsafe_setup_from_tau,
-    utils::{evaluate_all_lagrange_coefficients, load_backend},
+    utils::{evaluate_all_lagrange_coefficients, load_backend, get_device_is_cpu_or_gpu},
 };
 use criterion::{criterion_group, criterion_main, Criterion};
 
 /* RUN WITH: cargo bench --bench ipa */
 
-const N: usize = 1024;
-const LOG_N: usize = 10;
+const N: usize = 8192;
+const LOG_N: usize = 13;
 
 fn prove<const N: usize, C1, C2, F, U>(
     instance: &Instance<N, C1>,
@@ -52,7 +52,8 @@ where
 }
 
 fn criterion_benchmark(criterion: &mut Criterion) {
-    let cpu_or_gpu = load_backend();
+    load_backend();
+    let cpu_or_gpu = get_device_is_cpu_or_gpu();
 
     let domain = get_root_of_unity::<Bn254ScalarField>((N * N).try_into().unwrap());
     initialize_domain(domain, &NTTInitDomainConfig::default()).unwrap();
@@ -89,7 +90,7 @@ fn criterion_benchmark(criterion: &mut Criterion) {
         HostSlice::from_mut_slice(&mut ac_projective),
     )
     .unwrap();
-        
+    
     let mut ac_affine = Affine::<Bn254CurveCfg>::zero();
     Bn254CurveCfg::to_affine(&ac_projective[0], &mut ac_affine);
 

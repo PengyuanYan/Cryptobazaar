@@ -35,14 +35,14 @@ fn msm_device_benchmark() -> Vec<Projective::<Bn254CurveCfg>> {
     let n = 1024usize;
     let mut output_cpu = vec![Projective::<Bn254CurveCfg>::zero(); 1];
     let scalars = ScalarCfg::generate_random(n);
-    let bases = Bn254CurveCfg::generate_random_affine_points(n);
+    let bases = Bn254CurveCfg::generate_random_affine_points(1);
 
     let mut input_scalars_gpu =
         DeviceVec::<Bn254ScalarField>::device_malloc(n).expect("Failed to allocate device memory for input");
     let mut input_bases_gpu =
         DeviceVec::<Affine::<Bn254CurveCfg>>::device_malloc(n).expect("Failed to allocate device memory for input");
     let mut output_gpu =
-        DeviceVec::<Projective::<Bn254CurveCfg>>::device_malloc(n).expect("Failed to allocate device memory for output");
+        DeviceVec::<Projective::<Bn254CurveCfg>>::device_malloc(1).expect("Failed to allocate device memory for output");
     
     input_scalars_gpu
         .copy_from_host(HostSlice::from_slice(&scalars))
