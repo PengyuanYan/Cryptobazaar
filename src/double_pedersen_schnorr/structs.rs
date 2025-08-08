@@ -8,6 +8,7 @@ use ark_serialize::Compress;
 use ark_serialize::Valid;
 use ark_serialize::SerializationError;
 
+// the Error is direclty used from the original code
 #[derive(Debug)]
 pub enum Error {
     Relation1,

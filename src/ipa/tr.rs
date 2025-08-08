@@ -9,19 +9,19 @@ pub struct Transcript<const N: usize, const LOG_N: usize, C: Curve> {
 }
 
 impl<const N: usize, const LOG_N: usize, C: Curve> Transcript<N, LOG_N, C> {
-    pub(crate) fn new(init_label: &'static [u8]) -> Self {
+    pub fn new(init_label: &'static [u8]) -> Self {
         Self {
             tr: TranscriptOracle::new(init_label),
         }
     }
 
-    pub(crate) fn send_instance(&mut self, instance: &Instance<N, C>) {
+    pub fn send_instance(&mut self, instance: &Instance<N, C>) {
         let mut data = Vec::new();
         instance.serialize_with_mode(&mut data, Compress::No).unwrap();
         self.tr.send_message(b"ipa-instance", &data);
     }
 
-    pub(crate) fn send_l_r(&mut self, l: &Affine::<C>, r: &Affine::<C>) {
+    pub fn send_l_r(&mut self, l: &Affine::<C>, r: &Affine::<C>) {
         let mut data = Vec::new();
         
         let mut l_x = l.x.to_bytes_le();
@@ -37,11 +37,11 @@ impl<const N: usize, const LOG_N: usize, C: Curve> Transcript<N, LOG_N, C> {
         self.tr.send_message(b"r", &data);
     }
 
-    pub(crate) fn get_alpha_i(&mut self) -> C::ScalarField {
+    pub fn get_alpha_i(&mut self) -> C::ScalarField {
         self.tr.squeeze_challenge(b"chi")
     }
 
-    pub(crate) fn get_r(&mut self) -> C::ScalarField {
+    pub fn get_r(&mut self) -> C::ScalarField {
         self.tr.squeeze_challenge(b"r")
     }
 }

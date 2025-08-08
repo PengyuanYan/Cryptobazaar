@@ -7,6 +7,7 @@ use icicle_runtime::memory::HostSlice;
 use icicle_core::traits::FieldImpl;
 use icicle_core::traits::Arithmetic;
 use std::marker::PhantomData;
+use crate::utils::{my_ntt, get_device_is_cpu_or_gpu};
 
 pub struct BidEncoder<const P: usize, const N: usize, C: Curve> {
     pub(crate) bid: [C::ScalarField; N],
@@ -65,43 +66,20 @@ impl<const P: usize, const N: usize, C: Curve> BidEncoder<P, N, C> {
         <<C as Curve>::ScalarField as FieldImpl>::Config: NTT<<C as Curve>::ScalarField, <C as Curve>::ScalarField>,
         <C as Curve>::ScalarField: Arithmetic,
     {
+        let cpu_or_gpu = get_device_is_cpu_or_gpu();
+
         let mut rng = R::from_seed(seed);
-        //let domain = get_root_of_unity::<C::ScalarField>((N).try_into().unwrap());
         
-        let cfg = NTTConfig::<C::ScalarField>::default();
-        
-        let mut bid_coeffs = vec![C::ScalarField::zero(); N];
-        //initialize_domain(domain, &NTTInitDomainConfig::default()).unwrap();
-        ntt(
-            HostSlice::from_slice(&self.bid),
-            NTTDir::kInverse,
-            &cfg,
-            HostSlice::from_mut_slice(&mut bid_coeffs),
-        )
-        .unwrap();
+        //domain
+        let bid_coeffs = my_ntt::<C>(&self.bid, C::ScalarField::one(), NTTDir::kInverse, cpu_or_gpu);
         let bid = UnivariatePolynomial::from_coeffs(HostSlice::from_slice(&bid_coeffs), bid_coeffs.len());
-
-        let mut f_coeffs = vec![C::ScalarField::zero(); N];
+        
         //domain
-        ntt(
-            HostSlice::from_slice(&self.f),
-            NTTDir::kInverse,
-            &cfg,
-            HostSlice::from_mut_slice(&mut f_coeffs),
-        )
-        .unwrap();
+        let f_coeffs = my_ntt::<C>(&self.f, C::ScalarField::one(), NTTDir::kInverse, cpu_or_gpu);
         let f = UnivariatePolynomial::from_coeffs(HostSlice::from_slice(&f_coeffs), f_coeffs.len());
-
-
-        let mut r_coeffs = vec![C::ScalarField::zero(); N];
+        
         //domain
-        ntt(
-            HostSlice::from_slice(&self.r),
-            NTTDir::kInverse,
-            &cfg,
-            HostSlice::from_mut_slice(&mut r_coeffs),
-        )
-        .unwrap();
+        let r_coeffs = my_ntt::<C>(&self.r, C::ScalarField::one(), NTTDir::kInverse, cpu_or_gpu);
         let r = UnivariatePolynomial::from_coeffs(HostSlice::from_slice(&r_coeffs), r_coeffs.len());
 
         let mut r_inv_evals = self.r[0..P].to_vec();
@@ -111,8 +89,9 @@ impl<const P: usize, const N: usize, C: Curve> BidEncoder<P, N, C> {
 
         let mut r_inv_blinders = Self::sample_blinders(&mut rng, N - P);
         r_inv_evals.append(&mut r_inv_blinders);
+        
         //domain
-        ntt_inplace(HostSlice::from_mut_slice(&mut r_inv_evals), NTTDir::kInverse, &cfg).unwrap();
+        let r_inv_evals = my_ntt::<C>(&r_inv_evals, C::ScalarField::one(), NTTDir::kInverse, cpu_or_gpu);
         let r_inv = UnivariatePolynomial::from_coeffs(HostSlice::from_slice(&r_inv_evals), r_inv_evals.len());
         
         let mut diff_evals = vec![C::ScalarField::zero(); N];
@@ -127,30 +106,13 @@ impl<const P: usize, const N: usize, C: Curve> BidEncoder<P, N, C> {
         diff_evals.append(&mut diff_blinders);
         let mut g_blinders = Self::sample_blinders(&mut rng, N - P);
         g_evals.append(&mut g_blinders);
-
-        let mut diff_ntt_evals = vec![C::ScalarField::zero(); N];
+        
         //domain
-        ntt(
-            HostSlice::from_slice(&diff_evals[..N]),
-            NTTDir::kInverse,
-            &cfg,
-            HostSlice::from_mut_slice(&mut diff_ntt_evals),
-        )
-        .unwrap();
-
-        let mut g_ntt_evals = vec![C::ScalarField::zero(); N];
-        //domain
-        ntt(
-            HostSlice::from_slice(&g_evals[..N]),
-            NTTDir::kInverse,
-            &cfg,
-            HostSlice::from_mut_slice(&mut g_ntt_evals),
-        )
-        .unwrap();
-
-        //release_domain::<C::ScalarField>().unwrap();
-
+        let diff_ntt_evals = my_ntt::<C>(&diff_evals[..N], C::ScalarField::one(), NTTDir::kInverse, cpu_or_gpu);
         let diff = UnivariatePolynomial::from_coeffs(HostSlice::from_slice(&diff_ntt_evals), diff_ntt_evals.len());
+        
+        //domain
+        let g_ntt_evals = my_ntt::<C>(&g_evals[..N], C::ScalarField::one(), NTTDir::kInverse, cpu_or_gpu);
         let g = UnivariatePolynomial::from_coeffs(HostSlice::from_slice(&g_ntt_evals), g_ntt_evals.len());
 
         Witness {

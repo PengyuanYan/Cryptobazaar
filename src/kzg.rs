@@ -7,11 +7,13 @@ use icicle_core::{msm, msm::MSMConfig};
 use icicle_runtime::memory::HostSlice;
 
 use icicle_core::polynomials::UnivariatePolynomial;
-use crate::utils::get_coeffs_of_poly;
+use crate::utils::{msm_gpu, my_msm, get_coeffs_of_poly, get_device_is_cpu_or_gpu};
 
 use icicle_core::traits::Arithmetic;
 
 use std::collections::BTreeMap;
+
+use icicle_runtime::Device;
 
 pub mod lagrange;
 
@@ -105,11 +107,13 @@ where
 {
     pub fn commit<P>(
         pk: &PK<C1, C2, F>,
-        poly: &P
+        poly: &P,
     ) -> Result<Affine<C1>, Error> 
     where
         P: UnivariatePolynomial<Field = C1::ScalarField>,
-    {
+    {   
+        let cpu_or_gpu = get_device_is_cpu_or_gpu();
+
         let poly_degree = poly.degree().try_into().expect("Polynomial degree conversion failed");
         let srs_len = pk.srs.len();
 
@@ -118,19 +122,12 @@ where
         }
 
         let cfg = MSMConfig::default();
-        let mut projective_output = vec![Projective::<C1>::zero(); 1];
         let coeffs = get_coeffs_of_poly(poly);
 
-        msm::msm(
-            HostSlice::from_slice(&coeffs),
-            HostSlice::from_slice(&pk.srs[..coeffs.len()]),
-            &cfg,
-            HostSlice::from_mut_slice(&mut projective_output),
-        )
-        .unwrap();
+        let projective_output = my_msm(&coeffs, &pk.srs[..coeffs.len()], cpu_or_gpu);
         
         let mut affine_output = Affine::<C1>::zero();
-        C1::to_affine(&projective_output[0], &mut affine_output);
+        C1::to_affine(&projective_output, &mut affine_output);
         Ok(affine_output)
     }
 
@@ -150,7 +147,6 @@ where
         .take(polys.len())
         .collect();
         
-        //these poly related functions dont need ntt
         let mut batched = polys[0].clone();
         for i in 1..polys.len() {
            let gamma_poly = polys[i].mul_by_scalar(&powers_of_gamma[i - 1]);
@@ -184,21 +180,15 @@ where
         <C1 as Curve>::ScalarField: Arithmetic,
     {
         assert_eq!(commitments.len(), evaluations.len());
+        let cpu_or_gpu = get_device_is_cpu_or_gpu();
+
         let powers_of_gamma: Vec<_> = std::iter::successors(Some(C1::ScalarField::one()), |p| {
             Some(*p * separation_challenge)
         })
         .take(commitments.len())
         .collect();
-        
-        let cfg = MSMConfig::default();
-        let mut batched_commitment = vec![Projective::<C1>::zero(); 1];
-        msm::msm(
-            HostSlice::from_slice(&powers_of_gamma),
-            HostSlice::from_slice(commitments),
-            &cfg,
-            HostSlice::from_mut_slice(&mut batched_commitment),
-        )
-        .unwrap();
+
+        let batched_commitment = my_msm(&powers_of_gamma, commitments, cpu_or_gpu);
         
         let mut batched_eval = C1::ScalarField::zero();
         for i in 0..evaluations.len() {
@@ -216,7 +206,7 @@ where
         let minus_eval = C1::ScalarField::zero() - batched_eval;
         let y_root = C1::get_generator() * minus_eval;
 
-        let lhs = batched_commitment[0] + opening + y_root;
+        let lhs = batched_commitment + opening + y_root;
         let lhs_affine: Affine<C1> = lhs.into();
         
         let e1: F = C1::pairing(&lhs_affine, &vk.g2).expect("pairing failed");

@@ -19,12 +19,12 @@ pub enum Error {
 }
 
 pub struct Instance<C: Curve> {
-    pub(crate) n: usize,
-    pub(crate) p_base: Affine::<C>,
-    pub(crate) h_base: Affine::<C>,
-    pub(crate) a_cm: Affine::<C>,
-    pub(crate) pedersen: Affine::<C>,
-    pub(crate) challenges: Vec<C::ScalarField>,
+    pub n: usize,
+    pub p_base: Affine::<C>,
+    pub h_base: Affine::<C>,
+    pub a_cm: Affine::<C>,
+    pub pedersen: Affine::<C>,
+    pub challenges: Vec<C::ScalarField>,
 }
 
 impl<C: Curve> Valid for Instance<C> {
@@ -145,9 +145,9 @@ where
     C: Curve,
     P: UnivariatePolynomial<Field = C::ScalarField>,
 {
-    pub(crate) a: P,
-    pub(crate) x: C::ScalarField,
-    pub(crate) r: C::ScalarField,
+    pub a: P,
+    pub x: C::ScalarField,
+    pub r: C::ScalarField,
 }
 
 pub struct Proof<C: Curve> {

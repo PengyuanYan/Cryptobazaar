@@ -18,6 +18,7 @@ use icicle_runtime::memory::HostSlice;
 use icicle_core::ntt::{ntt, NTTDomain, NTTInitDomainConfig, NTTConfig, NTTDir, get_root_of_unity, initialize_domain, NTT, release_domain};
 use icicle_core::traits::Arithmetic;
 use icicle_core::{msm, msm::MSMConfig};
+use crate::utils::{my_ntt, get_device_is_cpu_or_gpu};
 
 use self::structs::{Error, Proof};
 use self::{structs::Instance, tr::Transcript};
@@ -59,7 +60,8 @@ where
     where
         <C1 as Curve>::ScalarField: Arithmetic,
         <<C1 as Curve>::ScalarField as FieldImpl>::Config: NTT<<C1 as Curve>::ScalarField, <C1 as Curve>::ScalarField>,
-    {
+    {  
+        let cpu_or_gpu = get_device_is_cpu_or_gpu();
         let mut tr = Transcript::<C1>::new(b"fold-lagrange");
 
         let folding_coeffs = compute_folding_coeffs::<C1>(&instance.challenges);
@@ -93,30 +95,13 @@ where
             sum = folding_coeffs[i] * beta_powers[i] + sum;
         }
         
-        //let domain = get_root_of_unity::<C1::ScalarField>((N).try_into().unwrap());
-        let cfg_ntt = NTTConfig::<C1::ScalarField>::default();
-        //initialize_domain(domain, &NTTInitDomainConfig::default()).unwrap();
-        let mut p_coeffs = vec![C1::ScalarField::zero(); folding_coeffs.len()];
-        ntt(
-            HostSlice::from_slice(&folding_coeffs),
-            NTTDir::kInverse,
-            &cfg_ntt,
-            HostSlice::from_mut_slice(&mut p_coeffs),
-        )
-        .unwrap();
+        // domain
+        let p_coeffs = my_ntt::<C1>(&folding_coeffs, C1::ScalarField::one(), NTTDir::kInverse, cpu_or_gpu);
         
         let p = U::from_coeffs(HostSlice::from_slice(&p_coeffs), p_coeffs.len());
         
-        let mut acc_coeffs = vec![C1::ScalarField::zero(); beta_powers.len()];
-        ntt(
-            HostSlice::from_slice(&beta_powers),
-            NTTDir::kInverse,
-            &cfg_ntt,
-            HostSlice::from_mut_slice(&mut acc_coeffs),
-        )
-        .unwrap();
-        
-        //release_domain::<C1::ScalarField>().unwrap();
+        // domain
+        let acc_coeffs = my_ntt::<C1>(&beta_powers, C1::ScalarField::one(), NTTDir::kInverse, cpu_or_gpu);
 
         let acc = U::from_coeffs(HostSlice::from_slice(&acc_coeffs), acc_coeffs.len());
 
@@ -201,6 +186,7 @@ where
 
         UnivariateSumcheck::<C1, C2, F, U>::verify(&proof.sumcheck_proof, &uv_instance, vk)?;
         AccArgument::<C1, C2, F>::verify(&acc_instance, &proof.acc_proof, vk)?;
+        
         Ok(())
     }
 }

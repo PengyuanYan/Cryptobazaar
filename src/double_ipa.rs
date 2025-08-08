@@ -7,6 +7,7 @@ use icicle_runtime::memory::HostSlice;
 use icicle_core::ntt::{NTTDomain, NTT};
 use icicle_core::traits::GenerateRandom;
 use icicle_core::traits::Arithmetic;
+use crate::utils::{msm_gpu, my_msm, my_ntt, get_coeffs_of_poly, get_device_is_cpu_or_gpu};
 
 use icicle_core::{msm, msm::MSMConfig};
 
@@ -33,6 +34,7 @@ pub enum Error {
                       },
     FoldWrongLength { a_len: usize, b1_len: usize, b2_len: usize },
     SanityMismatch { position: usize },
+    VerifyFail,
 }
 
 pub struct DoubleInnerProduct<const N: usize, const LOG_N: usize, C1, C2, F, U>
@@ -64,6 +66,8 @@ where
         <<C1 as Curve>::ScalarField as FieldImpl>::Config: GenerateRandom<<C1 as Curve>::ScalarField>,
         <<C1 as Curve>::ScalarField as FieldImpl>::Config: NTT<<C1 as Curve>::ScalarField, <C1 as Curve>::ScalarField>,
     {
+        let cpu_or_gpu = get_device_is_cpu_or_gpu();
+
         let mut acc_blinders_1 = C1::ScalarField::zero();
         let mut acc_blinders_2 = C1::ScalarField::zero();
 
@@ -81,18 +85,7 @@ where
         let r_pows: Vec<_> = std::iter::successors(Some(C1::ScalarField::one()), |p| Some(*p * r)).take(N).collect();
 
         let mut c1_fold_projective = instance.ac.clone().to_projective();
-
-        let cfg = MSMConfig::default();
-        let mut c2_fold_projective_v = vec![Projective::<C1>::zero(); 1];
-        msm::msm(
-            HostSlice::from_slice(&r_pows),
-            HostSlice::from_slice(&instance.c),
-            &cfg,
-            HostSlice::from_mut_slice(&mut c2_fold_projective_v),
-        )
-        .unwrap();
-
-        let mut c2_fold_projective = c2_fold_projective_v[0];
+        let mut c2_fold_projective = my_msm(&r_pows, &instance.c, cpu_or_gpu);
 
         let mut a_folded = witness.a.clone().to_vec();
 
@@ -142,57 +135,25 @@ where
             let l_1 = if a_left.len() == 1 { 
                 C1::mul_scalar(b1_right[0].to_projective(), a_left[0])
             } else {
-                let mut buf = [Projective::<C1>::zero()];
-                msm::msm(
-                    HostSlice::from_slice(a_left),
-                    HostSlice::from_slice(b1_right),
-                    &cfg,
-                    HostSlice::from_mut_slice(&mut buf),
-                )
-                .unwrap();
-                buf[0]
+                my_msm(&a_left, &b1_right, cpu_or_gpu)
             };
 
             let r_1 = if a_right.len() == 1 {
                 C1::mul_scalar(b1_left[0].to_projective(), a_right[0])
             } else {
-                let mut buf = [Projective::<C1>::zero()];
-                msm::msm(
-                    HostSlice::from_slice(a_right),
-                    HostSlice::from_slice(b1_left),
-                    &cfg,
-                    HostSlice::from_mut_slice(&mut buf),
-                )
-                .unwrap();
-                buf[0]
+                my_msm(&a_right, &b1_left, cpu_or_gpu)
             };
 
             let l_2 = if a_left.len() == 1 { 
                 C1::mul_scalar(b2_right[0].to_projective(), a_left[0])
             } else {
-                let mut buf = [Projective::<C1>::zero()];
-                msm::msm(
-                    HostSlice::from_slice(a_left),
-                    HostSlice::from_slice(b2_right),
-                    &cfg,
-                    HostSlice::from_mut_slice(&mut buf),
-                )
-                .unwrap();
-                buf[0]
+                my_msm(&a_left, &b2_right, cpu_or_gpu)
             };
 
             let r_2 = if a_right.len() == 1 {
                 C1::mul_scalar(b2_left[0].to_projective(), a_right[0])
             } else {
-                let mut buf = [Projective::<C1>::zero()];
-                msm::msm(
-                    HostSlice::from_slice(a_right),
-                    HostSlice::from_slice(b2_left),
-                    &cfg,
-                    HostSlice::from_mut_slice(&mut buf),
-                )
-                .unwrap();
-                buf[0]
+                my_msm(&a_right, &b2_left, cpu_or_gpu)
             };
 
             let blinders = <<C1::ScalarField as FieldImpl>::Config as GenerateRandom<C1::ScalarField>>::generate_random(4);
@@ -310,12 +271,13 @@ where
     pub fn verify(
         instance: &Instance<N, C1>,
         proof: &Proof<LOG_N, C1>,
-        vk: &KzgVk<C1, C2, F>
-    )
+        vk: &KzgVk<C1, C2, F>,
+    ) -> Result<(), Error>
     where
         <C1 as Curve>::ScalarField: Arithmetic,
         <<C1 as Curve>::ScalarField as FieldImpl>::Config: NTTDomain<<C1 as Curve>::ScalarField>,
     {
+        let cpu_or_gpu = get_device_is_cpu_or_gpu();
         let mut tr = Transcript::<N, LOG_N, _>::new(b"double-ipa");
         tr.send_instance(instance);
 
@@ -323,18 +285,7 @@ where
         let r_pows: Vec<_> = std::iter::successors(Some(C1::ScalarField::one()), |p| Some(*p * r)).take(N).collect();
 
         let mut c1_fold_projective = instance.ac.clone().to_projective();
-
-        let cfg = MSMConfig::default();
-        let mut c2_fold_projective_v = vec![Projective::<C1>::zero(); 1];
-        msm::msm(
-            HostSlice::from_slice(&r_pows),
-            HostSlice::from_slice(&instance.c),
-            &cfg,
-            HostSlice::from_mut_slice(&mut c2_fold_projective_v),
-        )
-        .unwrap();
-
-        let mut c2_fold_projective = c2_fold_projective_v[0];
+        let mut c2_fold_projective = my_msm(&r_pows, &instance.c, cpu_or_gpu);
         
         let mut b2_rescaled: Vec<Affine::<C1>> = Vec::with_capacity(instance.b.len());
 
@@ -365,16 +316,8 @@ where
 
         // now fold the basis b and check pedersen openings
         let fold_coeffs = compute_folding_coeffs::<C1>(&alpha_invs);
-        let mut b2_folded_projective_v = vec![Projective::<C1>::zero(); 1];
-        msm::msm(
-            HostSlice::from_slice(&fold_coeffs),
-            HostSlice::from_slice(&b2_rescaled),
-            &cfg,
-            HostSlice::from_mut_slice(&mut b2_folded_projective_v),
-        )
-        .unwrap();
 
-        let b2_folded_projective = b2_folded_projective_v[0];
+        let b2_folded_projective = my_msm(&fold_coeffs, &b2_rescaled, cpu_or_gpu);
         let mut b2_folded_affine = Affine::<C1>::zero();
         C1::to_affine(&b2_folded_projective, &mut b2_folded_affine);
 
@@ -400,7 +343,11 @@ where
         };
 
         let res = PSArgument::verify(&ps_instance, &proof.ps_proof);
-        assert!(res.is_ok());
+        if !res.is_ok() {
+            return Err(Error::VerifyFail);
+        }
+
+        Ok(())
     }
 }
 
@@ -505,11 +452,11 @@ mod double_ipa_tests {
             a: a.try_into().unwrap(),
         };
         
-        let proof =
-            DoubleInnerProduct::<N, LOG_N, Bn254CurveCfg, Bn254G2CurveCfg, Bn254PairingFieldImpl, Bn254Poly>::prove(&instance, &witness, &pk).unwrap();
-        
-        DoubleInnerProduct::<N, LOG_N, Bn254CurveCfg, Bn254G2CurveCfg, Bn254PairingFieldImpl, Bn254Poly>::verify(&instance, &proof, &vk);
+        let proof = DoubleInnerProduct::<N, LOG_N, Bn254CurveCfg, Bn254G2CurveCfg, Bn254PairingFieldImpl, Bn254Poly>::prove(&instance, &witness, &pk).unwrap();
+        let result = DoubleInnerProduct::<N, LOG_N, Bn254CurveCfg, Bn254G2CurveCfg, Bn254PairingFieldImpl, Bn254Poly>::verify(&instance, &proof, &vk);
 
         release_domain::<Bn254ScalarField>().unwrap();
+
+        assert!(result.is_ok());
     }
 }

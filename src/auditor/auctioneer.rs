@@ -3,6 +3,7 @@ use icicle_core::{msm, msm::MSMConfig};
 use icicle_runtime::memory::HostSlice;
 use icicle_core::traits::FieldImpl;
 use icicle_core::traits::Arithmetic;
+use crate::utils::{msm_gpu, my_msm, get_coeffs_of_poly, get_device_is_cpu_or_gpu};
 
 #[derive(Debug)]
 pub enum Error {
@@ -32,18 +33,27 @@ impl<const B: usize, C: Curve + icicle_core::msm::MSM<C>> AVAuditor<B, C> {
         let mut outputs = vec![Affine::<C>::zero(); B];
 
         let cfg = MSMConfig::default();
-        let mut projective_output = vec![Projective::<C>::zero(); 1];
-        
-        msm::msm(
-            HostSlice::from_slice(&x),
-            HostSlice::from_slice(&self.first_round_msgs),
-            &cfg,
-            HostSlice::from_mut_slice(&mut projective_output),
-        )
-        .unwrap();
+        let cpu_or_gpu = get_device_is_cpu_or_gpu();
+
+        // let projective_output = if cpu_or_gpu == 0 {
+        //     let mut projective_output_v = [Projective::<C>::zero()];
+        //         msm::msm(
+        //             HostSlice::from_slice(&x),
+        //             HostSlice::from_slice(&self.first_round_msgs),
+        //             &cfg,
+        //             HostSlice::from_mut_slice(&mut projective_output_v),
+        //         )
+        //         .unwrap();
+
+        //         projective_output_v[0]
+        //     } else {
+        //         msm_gpu(&x, &self.first_round_msgs)
+        // };
+
+        let projective_output = my_msm(&x, &self.first_round_msgs, cpu_or_gpu);
 
         let mut affine_output = Affine::<C>::zero();
-        C::to_affine(&projective_output[0], &mut affine_output);
+        C::to_affine(&projective_output, &mut affine_output);
 
         outputs[0] = affine_output;
 
@@ -67,20 +77,26 @@ impl<const B: usize, C: Curve + icicle_core::msm::MSM<C>> AVAuditor<B, C> {
         }
 
         let ones = vec![C::ScalarField::one(); B];
-        
-        let cfg = MSMConfig::default();
-        let mut projective_output = vec![Projective::<C>::zero(); 1];
-        
-        msm::msm(
-            HostSlice::from_slice(&ones),
-            HostSlice::from_slice(&self.second_round_msgs),
-            &cfg,
-            HostSlice::from_mut_slice(&mut projective_output),
-        )
-        .unwrap();
+
+        // let projective_output = if cpu_or_gpu == 0 {
+        //     let mut projective_output_v = [Projective::<C>::zero()];
+        //         msm::msm(
+        //             HostSlice::from_slice(&x),
+        //             HostSlice::from_slice(&self.first_round_msgs),
+        //             &cfg,
+        //             HostSlice::from_mut_slice(&mut projective_output_v),
+        //         )
+        //         .unwrap();
+
+        //         projective_output_v[0]
+        //     } else {
+        //         msm_gpu(&x, &self.first_round_msgs)
+        // };
+
+        let projective_output = my_msm(&x, &self.first_round_msgs, cpu_or_gpu);
 
         let mut affine_output = Affine::<C>::zero();
-        C::to_affine(&projective_output[0], &mut affine_output);
+        C::to_affine(&projective_output, &mut affine_output);
 
         let second_round_result = affine_output;
 

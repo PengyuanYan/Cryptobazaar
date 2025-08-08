@@ -1,3 +1,4 @@
+//The eums are directly used from original code
 #[derive(Debug, PartialEq, Clone, Copy)]
 pub(crate) enum OracleState {
     Round1Ongoing,

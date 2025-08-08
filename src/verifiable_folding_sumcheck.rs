@@ -8,6 +8,7 @@ use crate::utils::get_coeffs_of_poly;
 use icicle_core::ntt::{ntt, NTTDomain, NTTInitDomainConfig, NTTConfig, NTTDir, get_root_of_unity, initialize_domain, NTT, release_domain};
 use icicle_core::traits::GenerateRandom;
 use icicle_core::traits::Arithmetic;
+use crate::utils::{my_ntt, get_device_is_cpu_or_gpu};
 
 pub mod structs;
 mod tr;
@@ -61,14 +62,14 @@ where
         instance: &Instance<C1>,
         witness: &Witness<C1, U>,
         pk: &KzgPk<C1, C2, F>,
+        cpu_or_gpu: usize,
     ) -> Proof<C1> 
     where
         <C1 as Curve>::ScalarField: Arithmetic,
         <<C1 as Curve>::ScalarField as FieldImpl>::Config: NTTDomain<<C1 as Curve>::ScalarField> + NTT<<C1 as Curve>::ScalarField, <C1 as Curve>::ScalarField>,
     {
         assert!(is_pow_2(instance.n));
-
-        //let domain = get_root_of_unity::<C1::ScalarField>(instance.n.try_into().unwrap());
+        let cpu_or_gpu = get_device_is_cpu_or_gpu();
         let mut tr = Transcript::new(b"verifiable-folding-sumcheck");
 
         tr.send_instance(instance);
@@ -89,19 +90,9 @@ where
         let z_2 = c * witness.r + b_2;
 
         let b_evals = compute_folding_coeffs::<C1>(&instance.challenges);
-
-        let cfg = NTTConfig::<C1::ScalarField>::default();
-        //initialize_domain(domain, &NTTInitDomainConfig::default()).unwrap();
-        let mut b_coeffs = vec![C1::ScalarField::zero(); b_evals.len()];
-        ntt(
-            HostSlice::from_slice(&b_evals),
-            NTTDir::kInverse,
-            &cfg,
-            HostSlice::from_mut_slice(&mut b_coeffs),
-        )
-        .unwrap();
-
-        //release_domain::<C1::ScalarField>().unwrap();
+        
+        // domain_n
+        let b_coeffs = my_ntt::<C1>(&b_evals, C1::ScalarField::one(), NTTDir::kInverse, cpu_or_gpu);
 
         let b = U::from_coeffs(HostSlice::from_slice(&b_coeffs), b_coeffs.len());
         
@@ -109,9 +100,6 @@ where
         let a_nof_coeffs = witness.a.get_nof_coeffs();
         let b_nof_coeffs:u64 = b_coeffs.len().try_into().unwrap();
         assert_eq!(a_nof_coeffs, b_nof_coeffs);
-        //let max_domain_size:u64= a_nof_coeffs + b_nof_coeffs;
-        //let poly_domain = get_root_of_unity::<C1::ScalarField>(max_domain_size);
-        //initialize_domain(poly_domain, &NTTInitDomainConfig::default()).unwrap();
 
         let mut lhs_product = witness.a.mul(&b);
         lhs_product = lhs_product.mul_by_scalar(&c);
@@ -120,8 +108,6 @@ where
         let len = instance.n + 1;
         let mut vanishing_poly_coeffs = Vec::with_capacity(len);
 
-        //release_domain::<C1::ScalarField>().unwrap();
-
         vanishing_poly_coeffs.push(C1::ScalarField::zero() - C1::ScalarField::one());
         for _ in 0..(len - 2) {
             vanishing_poly_coeffs.push(C1::ScalarField::zero());
@@ -129,9 +115,6 @@ where
         vanishing_poly_coeffs.push(C1::ScalarField::one());
 
         let domain_vanishing_poly = U::from_coeffs(HostSlice::from_slice(&vanishing_poly_coeffs), len);
-        
-        //let poly_domain = get_root_of_unity::<C1::ScalarField>(len as u64);
-        //initialize_domain(poly_domain, &NTTInitDomainConfig::default()).unwrap();
 
         let (q, r) = lhs.divide(&domain_vanishing_poly);
 
@@ -164,14 +147,12 @@ where
         tr.second_round(&z_1, &z_2, &r_mod_x_cm, &r_degree_cm, &q_cm);
         let opening_challenge = tr.get_opening_challenge();
         
-        //these neet ntt domain
+        //these need ntt domain
         let a_opening = witness.a.eval(&opening_challenge);
         let blinder_opening = blinder.eval(&opening_challenge);
 
         let r_opening = r_mod_x.eval(&opening_challenge);
         let q_opening = q.eval(&opening_challenge);
-
-        //release_domain::<C1::ScalarField>().unwrap();
         
         tr.send_openings(&a_opening, &blinder_opening, &r_opening, &q_opening);
 
@@ -211,6 +192,7 @@ where
         proof: &Proof<C1>,
         vk: &KzgVk<C1, C2, F>,
         degree_check_vk: &DegreeCheckVK<C1, C2, F>,
+        cpu_or_gpu: usize
     ) -> Result<(), Error>
     where
         <C1 as Curve>::ScalarField: Arithmetic,
@@ -354,15 +336,12 @@ mod verifiable_folding_sumcheck_tests {
     use icicle_core::ntt::{release_domain};
 
     #[test]
-
     fn test_sumcheck() {
         let log_n = 4;
         let n = 1 << log_n;
         
         let domain = get_root_of_unity::<Bn254ScalarField>((n * n).try_into().unwrap());
         initialize_domain(domain, &NTTInitDomainConfig::default()).unwrap();
-
-        //let domain = get_root_of_unity::<Bn254ScalarField>(n);
 
         let tau = Bn254ScalarField::from_u32(100u32);
         let srs = unsafe_setup_from_tau::<Bn254CurveCfg>((n - 1) as usize, tau);
@@ -394,7 +373,6 @@ mod verifiable_folding_sumcheck_tests {
         let a_poly = Bn254Poly::from_coeffs(HostSlice::from_slice(&a_coeffs), a_coeffs.len());
 
         let cfg = NTTConfig::<Bn254ScalarField>::default();
-        //initialize_domain(domain, &NTTInitDomainConfig::default()).unwrap();
         let mut a_evals = vec![Bn254ScalarField::zero(); n as usize];
 
         ntt(
@@ -450,8 +428,8 @@ mod verifiable_folding_sumcheck_tests {
 
         let witness = Witness { a: a_poly, r, x };
 
-        let proof = Argument::<Bn254CurveCfg, Bn254G2CurveCfg, Bn254PairingFieldImpl, Bn254Poly>::prove(&instance, &witness, &pk);
-        let res = Argument::<Bn254CurveCfg, Bn254G2CurveCfg, Bn254PairingFieldImpl, Bn254Poly>::verify(&instance, &proof, &vk, &degree_check_vk);
+        let proof = Argument::<Bn254CurveCfg, Bn254G2CurveCfg, Bn254PairingFieldImpl, Bn254Poly>::prove(&instance, &witness, &pk, 0);
+        let res = Argument::<Bn254CurveCfg, Bn254G2CurveCfg, Bn254PairingFieldImpl, Bn254Poly>::verify(&instance, &proof, &vk, &degree_check_vk, 0);
         
         release_domain::<Bn254ScalarField>().unwrap();
 

@@ -62,6 +62,7 @@ where
     pub fn construct_bid_well_formation_proof<R: RngCore + SeedableRng>(
         &self,
         seed: R::Seed,
+        cpu_or_gpu: usize,
     ) -> GatesProof<C1> 
     where
         <<C1 as Curve>::ScalarField as FieldImpl>::Config: NTT<<C1 as Curve>::ScalarField, <C1 as Curve>::ScalarField>,

@@ -11,7 +11,7 @@ use icicle_core::traits::Arithmetic;
 use icicle_core::{msm, msm::MSMConfig};
 
 use crate::kzg::{DegreeCheckVK, PK as KzgPk, VK as KzgVk};
-use crate::utils::{msm_gpu, ntt_gpu};
+use crate::utils::{msm_gpu, my_msm, my_ntt, get_coeffs_of_poly, get_device_is_cpu_or_gpu};
 use crate::utils::folding::{compute_folding_coeffs, AffFold, FFold, Fold};
 use crate::verifiable_folding_sumcheck::{
     structs::{Error as VFSError, Instance as VFSInstance, Witness as VFSWitness},
@@ -20,6 +20,8 @@ use crate::verifiable_folding_sumcheck::{
 
 use self::structs::{Instance, Proof, Witness};
 use self::tr::Transcript;
+
+use std::ops::Mul;
 
 pub mod structs;
 pub mod tr;
@@ -62,6 +64,7 @@ where
         <<C1 as Curve>::ScalarField as FieldImpl>::Config: NTTDomain<<C1 as Curve>::ScalarField> + NTT<<C1 as Curve>::ScalarField, <C1 as Curve>::ScalarField>,
         <U as UnivariatePolynomial>::FieldConfig: GenerateRandom<<C1 as Curve>::ScalarField>,
     {
+        let cpu_or_gpu = get_device_is_cpu_or_gpu();
         let mut acc_blinders = C1::ScalarField::zero();
 
         let mut l_msgs = Vec::<Affine::<C1>>::with_capacity(LOG_N);
@@ -74,22 +77,8 @@ where
 
         let r = tr.get_r();
         let r_pows: Vec<_> = std::iter::successors(Some(C1::ScalarField::one()), |p| Some(*p * r)).take(N).collect();
-        
-        let cfg = MSMConfig::default();
-        let mut c_fold_projective = if cpu_or_gpu == 0 {
-            let mut c_fold_projective_v = vec![Projective::<C1>::zero(); 1];
-            msm::msm(
-                HostSlice::from_slice(&r_pows),
-                HostSlice::from_slice(&instance.c),
-                &cfg,
-                HostSlice::from_mut_slice(&mut c_fold_projective_v),
-            )
-            .unwrap();
 
-            c_fold_projective_v[0]
-        } else {
-             msm_gpu(&r_pows, &instance.c)
-        };
+        let mut c_fold_projective = my_msm(&r_pows, &instance.c, cpu_or_gpu);
 
         let mut a_folded = witness.a.clone().to_vec();
 
@@ -127,43 +116,13 @@ where
             let l = if a_left.len() == 1 { 
                 C1::mul_scalar(b_right[0].to_projective(), a_left[0])
             } else {
-                let result = if cpu_or_gpu == 0 {
-                    let mut buf = [Projective::<C1>::zero()];
-                    msm::msm(
-                        HostSlice::from_slice(a_left),
-                        HostSlice::from_slice(b_right),
-                        &cfg,
-                        HostSlice::from_mut_slice(&mut buf),
-                    )
-                    .unwrap();
-
-                    buf[0]
-                } else {
-                    msm_gpu(a_left, b_right)
-                };
-
-                result
+                my_msm(a_left, b_right, cpu_or_gpu)
             };
 
             let r = if a_right.len() == 1 { 
                 C1::mul_scalar(b_left[0].to_projective(), a_right[0])
             } else {
-                let result = if cpu_or_gpu == 0 {
-                    let mut buf = [Projective::<C1>::zero()];
-                    msm::msm(
-                        HostSlice::from_slice(a_right),
-                        HostSlice::from_slice(b_left),
-                        &cfg,
-                        HostSlice::from_mut_slice(&mut buf),
-                    )
-                    .unwrap();
-
-                    buf[0]
-                } else {
-                    msm_gpu(a_right, b_left)
-                };
-
-                result
+                my_msm(a_right, b_left, cpu_or_gpu)
             };
             
             let blinders = <<C1::ScalarField as FieldImpl>::Config as GenerateRandom<C1::ScalarField>>::generate_random(2);
@@ -188,8 +147,8 @@ where
             acc_blinders = acc_blinders + alpha_inv * blinder_l + alpha * blinder_r;
 
             // fold vectors
-            a_folded = FFold::<C1>::fold_vec(&a_folded, alpha).unwrap();
-            b_folded = AffFold::<C1>::fold_vec(&b_folded, alpha_inv).unwrap();
+            a_folded = FFold::<C1>::fold_vec(&a_folded, alpha).unwrap();//a_folded[..a_folded.len() / 2].to_vec();
+            b_folded = AffFold::<C1>::fold_vec(&b_folded, alpha_inv).unwrap();//b_folded[..b_folded.len() / 2].to_vec();
 
             // derive new cm
             c_fold_projective = C1::mul_scalar(l_projective, alpha_inv) + c_fold_projective + C1::mul_scalar(r_projective, alpha);
@@ -224,26 +183,8 @@ where
             challenges: alphas.try_into().unwrap(),
         };
         
-        //let domain = get_root_of_unity::<C1::ScalarField>((N).try_into().unwrap());
         let cfg = NTTConfig::<C1::ScalarField>::default();
-        //initialize_domain(domain, &NTTInitDomainConfig::default()).unwrap();
-        let mut a_coeffs = if cpu_or_gpu == 0 {
-            let mut ntt_result =vec![C1::ScalarField::zero(); witness.a.len()];
-            ntt(
-                HostSlice::from_slice(&witness.a),
-                NTTDir::kInverse,
-                &cfg,
-                HostSlice::from_mut_slice(&mut ntt_result),
-            )
-            .unwrap();
-
-            ntt_result
-        } else {
-            let coset_gen = C1::ScalarField::one();
-            ntt_gpu::<C1>(&witness.a, &coset_gen, NTTDir::kInverse)
-        };
-        
-        //release_domain::<C1::ScalarField>().unwrap();
+        let a_coeffs = my_ntt::<C1>(&witness.a, C1::ScalarField::one(), NTTDir::kInverse, cpu_or_gpu);
 
         let a = U::from_coeffs(HostSlice::from_slice(&a_coeffs), a_coeffs.len());
 
@@ -253,7 +194,7 @@ where
             r: acc_blinders,
         };
         
-        // sanity
+        //sanity
         let x = C1::mul_scalar(b_folded[0].to_projective(), a_folded[0])
               + C1::mul_scalar(instance.h_base.to_projective(), acc_blinders);
 
@@ -263,7 +204,7 @@ where
             });
         }
 
-        let vfs_proof = VFSArgument::<C1, C2, F, U>::prove(&vfs_instance, &vfs_witness, pk);
+        let vfs_proof = VFSArgument::<C1, C2, F, U>::prove(&vfs_instance, &vfs_witness, pk, cpu_or_gpu);
         
         Ok(Proof {
             l: l_msgs.try_into().unwrap(),
@@ -290,21 +231,7 @@ where
         let r = tr.get_r();
         let r_pows: Vec<_> = std::iter::successors(Some(C1::ScalarField::one()), |p| Some(*p * r)).take(N).collect();
 
-        let cfg = MSMConfig::default();
-        let mut c_fold_projective = if cpu_or_gpu == 0 {
-            let mut c_fold_projective_v = vec![Projective::<C1>::zero(); 1];
-            msm::msm(
-                HostSlice::from_slice(&r_pows),
-                HostSlice::from_slice(&instance.c),
-                &cfg,
-                HostSlice::from_mut_slice(&mut c_fold_projective_v),
-            )
-            .unwrap();
-
-            c_fold_projective_v[0]
-        } else {
-             msm_gpu(&r_pows, &instance.c)
-        };
+        let mut c_fold_projective = my_msm(&r_pows, &instance.c, cpu_or_gpu);
 
         let mut b_rescaled: Vec<Affine::<C1>> = Vec::with_capacity(instance.b.len());
 
@@ -339,17 +266,9 @@ where
 
         // now fold the basis b and check pedersen openings
         let fold_coeffs = compute_folding_coeffs::<C1>(&alpha_invs);
+        
+        let mut b_folded_projective = my_msm(&fold_coeffs, &b_rescaled, cpu_or_gpu);
 
-        let mut b_folded_projective_v = vec![Projective::<C1>::zero(); 1];
-        msm::msm(
-            HostSlice::from_slice(&fold_coeffs),
-            HostSlice::from_slice(&b_rescaled),
-            &cfg,
-            HostSlice::from_mut_slice(&mut b_folded_projective_v),
-        )
-        .unwrap();
-
-        let b_folded_projective = b_folded_projective_v[0];
         let mut b_folded_affine = Affine::<C1>::zero();
         C1::to_affine(&b_folded_projective, &mut b_folded_affine);
 
@@ -362,7 +281,7 @@ where
             challenges: alphas.try_into().unwrap(),
         };
 
-        VFSArgument::<C1, C2, F, U>::verify(&vfs_instance, &proof.vfs_proof, vk, degree_check_vk)?;
+        VFSArgument::<C1, C2, F, U>::verify(&vfs_instance, &proof.vfs_proof, vk, degree_check_vk, cpu_or_gpu)?;
         Ok(())
     }
 }
