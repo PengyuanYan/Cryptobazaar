@@ -107,41 +107,10 @@ impl<const B: usize, C: Curve + icicle_core::msm::MSM<C>> AVOracle<B, C> {
 
         let mut outputs = vec![Projective::<C>::zero(); B];
 
-        // let cfg = MSMConfig::default();
-        // let mut projective_output = vec![Projective::<C>::zero(); 1];
-        
-        // msm::msm(
-        //     HostSlice::from_slice(&x),
-        //     HostSlice::from_slice(&self.first_msgs),
-        //     &cfg,
-        //     HostSlice::from_mut_slice(&mut projective_output),
-        // )
-        // .unwrap();
-
         let cpu_or_gpu = get_device_is_cpu_or_gpu();
-
-        // let projective_output = if cpu_or_gpu == 0 {
-        //     let cfg = MSMConfig::default();
-        //     let mut projective_output_v = [Projective::<C>::zero()];
-        //         msm::msm(
-        //             HostSlice::from_slice(&x),
-        //             HostSlice::from_slice(&self.first_msgs),
-        //             &cfg,
-        //             HostSlice::from_mut_slice(&mut projective_output_v),
-        //         )
-        //         .unwrap();
-
-        //         projective_output_v[0]
-        //     } else {
-        //         msm_gpu(&x, &self.first_msgs)
-        // };
-
         let projective_output = my_msm(&x, &self.first_msgs, cpu_or_gpu);
 
-        //let mut affine_output = Affine::<C>::zero();
-        //C::to_affine(&projective_output[0], &mut affine_output);
-
-        outputs[B-1] = projective_output;//affine_output;
+        outputs[B-1] = projective_output;
 
         /*
            0 -1 -1 -1
@@ -152,9 +121,7 @@ impl<const B: usize, C: Curve + icicle_core::msm::MSM<C>> AVOracle<B, C> {
         for i in 0..(B - 1) {
             let idx = B - 2 - i;
             let projective_output = outputs[idx + 1] - self.first_msgs[idx + 1].to_projective() - self.first_msgs[idx].to_projective();
-            // let mut affine_output = Affine::<C>::zero();
-            // C::to_affine(&projective_output, &mut affine_output);
-            outputs[idx] = projective_output;// affine_output;
+            outputs[idx] = projective_output;
         }
 
         self.state = OracleState::Round2Ongoing;
@@ -169,22 +136,6 @@ impl<const B: usize, C: Curve + icicle_core::msm::MSM<C>> AVOracle<B, C> {
         let ones = vec![C::ScalarField::one(); B];
 
         let cpu_or_gpu = get_device_is_cpu_or_gpu();
-
-        // let projective_output = if cpu_or_gpu == 0 {
-        //     let cfg = MSMConfig::default();
-        //     let mut projective_output_v = [Projective::<C>::zero()];
-        //         msm::msm(
-        //             HostSlice::from_slice(&ones),
-        //             HostSlice::from_slice(&self.second_msgs),
-        //             &cfg,
-        //             HostSlice::from_mut_slice(&mut projective_output_v),
-        //         )
-        //         .unwrap();
-
-        //         projective_output_v[0]
-        //     } else {
-        //         msm_gpu(&ones, &self.second_msgs)
-        // };
 
         let projective_output = my_msm(&ones, &self.second_msgs, cpu_or_gpu);
 
