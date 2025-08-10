@@ -2,7 +2,7 @@ use icicle_core::traits::FieldImpl;
 use icicle_core::polynomials::UnivariatePolynomial;
 use icicle_core::ntt::{ntt, NTTInitDomainConfig, NTTConfig, NTTDir, get_root_of_unity, NTTDomain, NTT};
 use icicle_core::traits::Arithmetic;
-use icicle_runtime::{Device};//,runtime};
+use icicle_runtime::{Device,runtime};
 
 use icicle_core::curve::{Curve, Projective, Affine};
 use icicle_core::{msm, msm::MSMConfig};
@@ -105,7 +105,7 @@ where
 }
 
 pub fn load_backend() {
-    //runtime::load_backend_from_env_or_default().unwrap();
+    runtime::load_backend_from_env_or_default().unwrap();
     let device_gpu = Device::new("CUDA", 0);
     let is_cuda_device_available = icicle_runtime::is_device_available(&device_gpu);
     if is_cuda_device_available {
@@ -219,10 +219,10 @@ where
 
     if coset_gen != C::ScalarField::one() {
         cfg.coset_gen = coset_gen;
-        println!("not one");
-    } else {
-        println!("is one");
-    }
+        //println!("not one");
+    } //else {
+    //    println!("is one");
+    //}
 
     let result_coeffs = if cpu_or_gpu == 0 {
         let mut output_scalars = vec![C::ScalarField::zero(); scalars.len()];

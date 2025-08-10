@@ -3,6 +3,7 @@ use self::{
     enums::{AVError, OracleState},
 };
 
+use crate::utils::get_device_is_cpu_or_gpu;
 use icicle_core::curve::{Curve,Affine,Projective};
 
 mod av_oracle;
@@ -75,11 +76,12 @@ impl<const N: usize, const B: usize, C: Curve + icicle_core::msm::MSM<C>> Auctio
     pub fn output_first_round(&mut self) -> Vec<Vec<Projective::<C>>> {
         assert_eq!(self.state, OracleState::Round1Completed);
         self.state = OracleState::Round2Ongoing;
-        
+        let cpu_or_gpu = get_device_is_cpu_or_gpu();
+
         // may influence efficiency
         let mut result = Vec::new();
         for av_i in &mut self.av_oracles {
-            result.push(av_i.output_first_round());
+            result.push(av_i.output_first_round(cpu_or_gpu));
         }
         result
     }
@@ -87,11 +89,12 @@ impl<const N: usize, const B: usize, C: Curve + icicle_core::msm::MSM<C>> Auctio
     pub fn output_second_round(&mut self) -> Vec<Affine::<C>> {
         assert_eq!(self.state, OracleState::Round2Completed);
         self.state = OracleState::Completed;
+        let cpu_or_gpu = get_device_is_cpu_or_gpu();
 
         // may influence efficiency
         let mut result = Vec::new();
         for av_i in &mut self.av_oracles {
-            result.push(av_i.output_second_round());
+            result.push(av_i.output_second_round(cpu_or_gpu));
         }
         result
     }

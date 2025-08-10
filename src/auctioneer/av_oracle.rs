@@ -97,7 +97,7 @@ impl<const B: usize, C: Curve + icicle_core::msm::MSM<C>> AVOracle<B, C> {
     }
 ////////////
 /////////////////////////////////////////////////////////////////////////////
-    pub fn output_first_round(&mut self) -> Vec<Projective::<C>> {
+    pub fn output_first_round(&mut self, cpu_or_gpu: usize) -> Vec<Projective::<C>> {
         assert_eq!(self.state, OracleState::Round1Completed);
 
         let mut x: Vec<C::ScalarField> = (0..B)
@@ -107,7 +107,6 @@ impl<const B: usize, C: Curve + icicle_core::msm::MSM<C>> AVOracle<B, C> {
 
         let mut outputs = vec![Projective::<C>::zero(); B];
 
-        let cpu_or_gpu = get_device_is_cpu_or_gpu();
         let projective_output = my_msm(&x, &self.first_msgs, cpu_or_gpu);
 
         outputs[B-1] = projective_output;
@@ -129,13 +128,11 @@ impl<const B: usize, C: Curve + icicle_core::msm::MSM<C>> AVOracle<B, C> {
         outputs
     }
 
-    pub fn output_second_round(&mut self) -> Affine::<C> {
+    pub fn output_second_round(&mut self, cpu_or_gpu: usize) -> Affine::<C> {
         assert_eq!(self.state, OracleState::Round2Completed);
         self.state = OracleState::Completed;
 
         let ones = vec![C::ScalarField::one(); B];
-
-        let cpu_or_gpu = get_device_is_cpu_or_gpu();
 
         let projective_output = my_msm(&ones, &self.second_msgs, cpu_or_gpu);
 
@@ -177,7 +174,7 @@ mod av_oracle_tests {
             av_oracle.register_msg(first_msgs[i], i).unwrap();
         }
 
-        let round_outputs = av_oracle.output_first_round();
+        let round_outputs = av_oracle.output_first_round(0);
         let second_msgs: Vec<Affine::<Bn254CurveCfg>> = party_secrets
             .iter()
             .zip(round_outputs.iter())
@@ -188,7 +185,7 @@ mod av_oracle_tests {
             av_oracle.register_msg(second_msgs[i], i).unwrap();
         }
 
-        let output = av_oracle.output_second_round();
+        let output = av_oracle.output_second_round(0);
         assert_eq!(output, Affine::<Bn254CurveCfg>::zero());
     }
 
@@ -211,7 +208,7 @@ mod av_oracle_tests {
             av_oracle.register_msg(first_msgs[i], i).unwrap();
         }
 
-        let round_outputs = av_oracle.output_first_round();
+        let round_outputs = av_oracle.output_first_round(0);
 
         // at least one party picks a new secret
         party_secrets[0] = ScalarCfg::generate_random(1)[0];
@@ -226,7 +223,7 @@ mod av_oracle_tests {
             av_oracle.register_msg(second_msgs[i], i).unwrap();
         }
 
-        let output = av_oracle.output_second_round();
+        let output = av_oracle.output_second_round(0);
         assert_ne!(output, Affine::<Bn254CurveCfg>::zero());
     }
 }
