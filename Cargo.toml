@@ -61,3 +61,7 @@ harness = false
 [[bench]]
 name = "nttbenchmark"
 harness = false
+
+[[bench]]
+name = "loadtoandfromdevice"
+harness = false
