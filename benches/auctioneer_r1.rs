@@ -20,11 +20,6 @@ fn setup_round_1<const N: usize, const B: usize>() -> Auctioneer<N, B, Bn254Curv
     let mut secrets = vec![vec![Bn254ScalarField::zero(); N]; B];
     let mut first_msgs = vec![vec![Affine::<Bn254CurveCfg>::zero(); N]; B];
     
-    let fake = Affine::<Bn254CurveCfg> {
-                 x: <Bn254CurveCfg as Curve>::BaseField::one(),
-                 y: <Bn254CurveCfg as Curve>::BaseField::one(),
-    };
-    
     // initialize n msgs for each party
     for i in 0..B {
         let generated_secrets = ScalarCfg::generate_random(N);
@@ -53,7 +48,7 @@ fn setup_round_1<const N: usize, const B: usize>() -> Auctioneer<N, B, Bn254Curv
 
 fn bench_first_round<const N: usize, const B: usize>(
     a: Auctioneer<N, B, Bn254CurveCfg>,
-) -> Vec<Vec<Projective::<Bn254CurveCfg>>> {
+) -> Vec<Vec<Affine::<Bn254CurveCfg>>> {
     let mut a_clone = a.clone();
     a_clone.output_first_round()
 }

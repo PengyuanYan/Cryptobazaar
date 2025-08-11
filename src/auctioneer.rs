@@ -73,7 +73,7 @@ impl<const N: usize, const B: usize, C: Curve + icicle_core::msm::MSM<C>> Auctio
     }
 ////////////
 /////////////////////////////////////////////////////////////////////////////
-    pub fn output_first_round(&mut self) -> Vec<Vec<Projective::<C>>> {
+    pub fn output_first_round(&mut self) -> Vec<Vec<Affine::<C>>> {
         assert_eq!(self.state, OracleState::Round1Completed);
         self.state = OracleState::Round2Ongoing;
         let cpu_or_gpu = get_device_is_cpu_or_gpu();

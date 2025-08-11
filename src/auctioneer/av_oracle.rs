@@ -97,7 +97,7 @@ impl<const B: usize, C: Curve + icicle_core::msm::MSM<C>> AVOracle<B, C> {
     }
 ////////////
 /////////////////////////////////////////////////////////////////////////////
-    pub fn output_first_round(&mut self, cpu_or_gpu: usize) -> Vec<Projective::<C>> {
+    pub fn output_first_round(&mut self, cpu_or_gpu: usize) -> Vec<Affine::<C>> {
         assert_eq!(self.state, OracleState::Round1Completed);
 
         let mut x: Vec<C::ScalarField> = (0..B)
@@ -105,11 +105,11 @@ impl<const B: usize, C: Curve + icicle_core::msm::MSM<C>> AVOracle<B, C> {
                      else { C::ScalarField::one() })
         .collect();
 
-        let mut outputs = vec![Projective::<C>::zero(); B];
+        let mut outputs = vec![Affine::<C>::zero(); B];
 
         let projective_output = my_msm(&x, &self.first_msgs, cpu_or_gpu);
 
-        outputs[B-1] = projective_output;
+        outputs[B-1] = projective_output.into();
 
         /*
            0 -1 -1 -1
@@ -119,8 +119,8 @@ impl<const B: usize, C: Curve + icicle_core::msm::MSM<C>> AVOracle<B, C> {
         */
         for i in 0..(B - 1) {
             let idx = B - 2 - i;
-            let projective_output = outputs[idx + 1] - self.first_msgs[idx + 1].to_projective() - self.first_msgs[idx].to_projective();
-            outputs[idx] = projective_output;
+            let projective_output = outputs[idx + 1].to_projective() - self.first_msgs[idx + 1].to_projective() - self.first_msgs[idx].to_projective();
+            outputs[idx] = projective_output.into();
         }
 
         self.state = OracleState::Round2Ongoing;

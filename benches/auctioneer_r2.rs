@@ -49,7 +49,7 @@ fn setup_round_2<const N: usize, const B: usize>() -> Auctioneer<N, B, Bn254Curv
     let mut second_msgs = vec![vec![Affine::<Bn254CurveCfg>::zero(); N]; B];
     for i in 0..B {
         for j in 0..N {
-            let projective_result = fr_result[j][i].mul(secrets[i][j]);
+            let projective_result = fr_result[j][i].to_projective().mul(secrets[i][j]);
             let mut affine_result = Affine::<Bn254CurveCfg>::zero();
             Bn254CurveCfg::to_affine(&projective_result, &mut affine_result);
             second_msgs[i][j] = affine_result;
