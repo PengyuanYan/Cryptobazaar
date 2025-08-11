@@ -23,7 +23,7 @@ use criterion::{criterion_group, criterion_main, Criterion};
 
 /* RUN WITH: cargo bench --bench veceq */
 
-const N: usize = 8192;
+const N: usize = 128;
 
 fn criterion_benchmark(criterion: &mut Criterion) {
     load_backend();

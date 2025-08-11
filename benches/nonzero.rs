@@ -15,14 +15,14 @@ use std::ops::Mul;
 use cryptobazaar::kzg::{Kzg, PK, VK};
 use cryptobazaar::{
     utils::srs::unsafe_setup_from_tau,
-    utils::load_backend,
+    utils::{load_backend, my_ntt, get_device_is_cpu_or_gpu},
 };
 
 use criterion::{criterion_group, criterion_main, Criterion};
 
 /* RUN WITH: cargo bench --bench nonzero */
 
-const N: usize = 8192;
+const N: usize = 128;
 
 fn criterion_benchmark(criterion: &mut Criterion) {
     load_backend();
@@ -61,68 +61,34 @@ fn criterion_benchmark(criterion: &mut Criterion) {
                 r_inv_coset_fft 
                 q_ifft 
                 commit to q 
-                commit to quotient for kzg opening 
+                commit to quotient for kzg opening
 
                 so we can just bench 5 ffts and 4 kzg commits to get realistic bench
              */
+            let cpu_or_gpu = get_device_is_cpu_or_gpu();
             let x = ScalarCfg::generate_random(N);
             let cfg = NTTConfig::<Bn254ScalarField>::default();
-            let mut x_coeffs = vec![Bn254ScalarField::zero(); N];
-            ntt(
-                HostSlice::from_slice(&x),
-                NTTDir::kInverse,
-                &cfg,
-                HostSlice::from_mut_slice(&mut x_coeffs),
-            )
-            .unwrap();
+            let mut x_coeffs = my_ntt::<Bn254CurveCfg>(&x, <Bn254CurveCfg as Curve>::ScalarField::one(), NTTDir::kInverse, cpu_or_gpu);
             let x_poly = Bn254Poly::from_coeffs(HostSlice::from_slice(&x_coeffs), x_coeffs.len());
             let _ = Kzg::commit(&pk, &x_poly);
 
             let x = ScalarCfg::generate_random(N);
-            let mut x_coeffs = vec![Bn254ScalarField::zero(); N];
-            ntt(
-                HostSlice::from_slice(&x),
-                NTTDir::kInverse,
-                &cfg,
-                HostSlice::from_mut_slice(&mut x_coeffs),
-            )
-            .unwrap();
+            let mut x_coeffs = my_ntt::<Bn254CurveCfg>(&x, <Bn254CurveCfg as Curve>::ScalarField::one(), NTTDir::kInverse, cpu_or_gpu);
             let x_poly = Bn254Poly::from_coeffs(HostSlice::from_slice(&x_coeffs), x_coeffs.len());
             let _ = Kzg::commit(&pk, &x_poly);
 
             let x = ScalarCfg::generate_random(N);
-            let mut x_coeffs = vec![Bn254ScalarField::zero(); N];
-            ntt(
-                HostSlice::from_slice(&x),
-                NTTDir::kInverse,
-                &cfg,
-                HostSlice::from_mut_slice(&mut x_coeffs),
-            )
-            .unwrap();
+            let mut x_coeffs = my_ntt::<Bn254CurveCfg>(&x, <Bn254CurveCfg as Curve>::ScalarField::one(), NTTDir::kInverse, cpu_or_gpu);
             let x_poly = Bn254Poly::from_coeffs(HostSlice::from_slice(&x_coeffs), x_coeffs.len());
             let _ = Kzg::commit(&pk, &x_poly);
 
             let x = ScalarCfg::generate_random(N);
-            let mut x_coeffs = vec![Bn254ScalarField::zero(); N];
-            ntt(
-                HostSlice::from_slice(&x),
-                NTTDir::kInverse,
-                &cfg,
-                HostSlice::from_mut_slice(&mut x_coeffs),
-            )
-            .unwrap();
+            let mut x_coeffs = my_ntt::<Bn254CurveCfg>(&x, <Bn254CurveCfg as Curve>::ScalarField::one(), NTTDir::kInverse, cpu_or_gpu);
             let x_poly = Bn254Poly::from_coeffs(HostSlice::from_slice(&x_coeffs), x_coeffs.len());
             let _ = Kzg::commit(&pk, &x_poly);
 
             let x = ScalarCfg::generate_random(N);
-            let mut x_coeffs = vec![Bn254ScalarField::zero(); N];
-            ntt(
-                HostSlice::from_slice(&x),
-                NTTDir::kInverse,
-                &cfg,
-                HostSlice::from_mut_slice(&mut x_coeffs),
-            )
-            .unwrap();
+            let mut x_coeffs = my_ntt::<Bn254CurveCfg>(&x, <Bn254CurveCfg as Curve>::ScalarField::one(), NTTDir::kInverse, cpu_or_gpu);
             let x_poly = Bn254Poly::from_coeffs(HostSlice::from_slice(&x_coeffs), x_coeffs.len());
         })
     });

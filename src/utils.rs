@@ -107,7 +107,7 @@ where
 }
 
 pub fn load_backend() {
-    runtime::load_backend_from_env_or_default().unwrap();
+    //runtime::load_backend_from_env_or_default().unwrap();
     let device_gpu = Device::new("CUDA", 0);
     let is_cuda_device_available = icicle_runtime::is_device_available(&device_gpu);
     if is_cuda_device_available {
@@ -136,10 +136,10 @@ pub fn get_device_is_cpu_or_gpu() -> usize {
     let mut cpu_or_gpu: usize = 0;
     let device = icicle_runtime::get_active_device().unwrap();
     if device.get_device_type() == "CUDA" {
-        println!("gpu correct");
+        //println!("gpu correct");
         cpu_or_gpu = 1;
     } else if device.get_device_type() == "CPU"{
-        println!("cpu correct");
+        //println!("cpu correct");
     } else {
         panic!("cant find gpu or cpu");
     }

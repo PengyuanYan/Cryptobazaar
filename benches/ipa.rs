@@ -28,8 +28,8 @@ use criterion::{criterion_group, criterion_main, Criterion};
 
 /* RUN WITH: cargo bench --bench ipa */
 
-const N: usize = 8192;
-const LOG_N: usize = 13;
+const N: usize = 128;
+const LOG_N: usize = 7;
 
 fn prove<const N: usize, C1, C2, F, U>(
     instance: &Instance<N, C1>,

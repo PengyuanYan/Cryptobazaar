@@ -11,7 +11,7 @@ use icicle_core::traits::Arithmetic;
 use icicle_core::{msm, msm::MSMConfig};
 
 use crate::kzg::{DegreeCheckVK, PK as KzgPk, VK as KzgVk};
-use crate::utils::{msm_gpu, my_msm, my_ntt, get_coeffs_of_poly, get_device_is_cpu_or_gpu};
+use crate::utils::{msm_gpu, my_msm, my_ntt, get_coeffs_of_poly, get_device_is_cpu_or_gpu, to_affine_batched};
 use crate::utils::folding::{compute_folding_coeffs, AffFold, FFold, Fold};
 use crate::verifiable_folding_sumcheck::{
     structs::{Error as VFSError, Instance as VFSInstance, Witness as VFSWitness},
@@ -22,6 +22,8 @@ use self::structs::{Instance, Proof, Witness};
 use self::tr::Transcript;
 
 use std::ops::Mul;
+
+use rayon::prelude::*;
 
 pub mod structs;
 pub mod tr;
@@ -65,6 +67,9 @@ where
         <U as UnivariatePolynomial>::FieldConfig: GenerateRandom<<C1 as Curve>::ScalarField>,
     {
         let cpu_or_gpu = get_device_is_cpu_or_gpu();
+
+        let avaliable_threads = rayon::current_num_threads().max(1);
+
         let mut acc_blinders = C1::ScalarField::zero();
 
         let mut l_msgs = Vec::<Affine::<C1>>::with_capacity(LOG_N);
@@ -82,7 +87,7 @@ where
 
         let mut a_folded = witness.a.clone().to_vec();
 
-        let mut b_folded: Vec<Affine::<C1>> = Vec::with_capacity(instance.b.len());
+        let mut b_folded: Vec<Projective::<C1>> = Vec::with_capacity(instance.b.len());
 
         for i in 0..instance.b.len() {
             let bi = instance.b[i];
@@ -90,18 +95,20 @@ where
 
             let result_projective = C1::mul_scalar(bi.to_projective(), ri);
 
-            let mut result_affine = Affine::<C1>::zero();
-            C1::to_affine(&result_projective, &mut result_affine);
-
-            b_folded.push(result_affine);
+            b_folded.push(result_projective);
         }
+
+        let mut b_folded = to_affine_batched(&b_folded);
         
         for round in 0..(LOG_N) as usize {
-            let a_left = &a_folded[..a_folded.len() / 2];
-            let a_right = &a_folded[a_folded.len() / 2..];
+            assert_eq!(a_folded.len(), b_folded.len());
 
-            let b_left = &b_folded[..b_folded.len() / 2];
-            let b_right = &b_folded[b_folded.len() / 2..];
+            let mid = a_folded.len() / 2;
+            let a_left = &a_folded[..mid];
+            let a_right = &a_folded[mid..];
+
+            let b_left = &b_folded[..mid];
+            let b_right = &b_folded[mid..];
 
             if a_left.len() != b_right.len() || a_right.len() != b_left.len() {
                 return Err(Error::FoldShapeMismatch {
@@ -112,18 +119,20 @@ where
                     b_left: b_left.len(),
                 });
             }
+        
+            let chunk = std::cmp::max(1, (a_left.len() + avaliable_threads - 1) / avaliable_threads);
 
-            let l = if a_left.len() == 1 { 
-                C1::mul_scalar(b_right[0].to_projective(), a_left[0])
-            } else {
-                my_msm(a_left, b_right, cpu_or_gpu)
-            };
+            let l: Projective<C1> = a_left
+                .par_chunks(chunk)
+                .zip(b_right.par_chunks(chunk))
+                .map(|(a_chunk, b_chunk)| my_msm::<C1>(a_chunk, b_chunk, cpu_or_gpu))
+                .reduce(|| Projective::<C1>::zero(), |acc, x| acc + x);
 
-            let r = if a_right.len() == 1 { 
-                C1::mul_scalar(b_left[0].to_projective(), a_right[0])
-            } else {
-                my_msm(a_right, b_left, cpu_or_gpu)
-            };
+            let r: Projective<C1> = a_right
+                .par_chunks(chunk)
+                .zip(b_left.par_chunks(chunk))
+                .map(|(a_chunk, b_chunk)| my_msm::<C1>(a_chunk, b_chunk, cpu_or_gpu))
+                .reduce(|| Projective::<C1>::zero(), |acc, x| acc + x);
             
             let blinders = <<C1::ScalarField as FieldImpl>::Config as GenerateRandom<C1::ScalarField>>::generate_random(2);
             let blinder_l = blinders[0];
@@ -147,8 +156,8 @@ where
             acc_blinders = acc_blinders + alpha_inv * blinder_l + alpha * blinder_r;
 
             // fold vectors
-            a_folded = FFold::<C1>::fold_vec(&a_folded, alpha).unwrap();//a_folded[..a_folded.len() / 2].to_vec();
-            b_folded = AffFold::<C1>::fold_vec(&b_folded, alpha_inv).unwrap();//b_folded[..b_folded.len() / 2].to_vec();
+            a_folded = FFold::<C1>::fold_vec(&a_folded, alpha).unwrap();
+            b_folded = AffFold::<C1>::fold_vec(&b_folded, alpha_inv).unwrap();
 
             // derive new cm
             c_fold_projective = C1::mul_scalar(l_projective, alpha_inv) + c_fold_projective + C1::mul_scalar(r_projective, alpha);

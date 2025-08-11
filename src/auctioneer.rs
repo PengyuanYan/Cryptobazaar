@@ -7,6 +7,7 @@ use crate::utils::get_device_is_cpu_or_gpu;
 use icicle_core::curve::{Curve,Affine,Projective};
 
 use rayon::prelude::*;
+use crate::utils::to_affine_batched;
 
 mod av_oracle;
 pub(crate) mod enums;
@@ -80,7 +81,7 @@ impl<const N: usize, const B: usize, C: Curve + icicle_core::msm::MSM<C>> Auctio
         self.state = OracleState::Round2Ongoing;
         let cpu_or_gpu = get_device_is_cpu_or_gpu();
 
-        // // may influence efficiency
+        //may influence efficiency
         // let mut result = Vec::new();
         // for av_i in &mut self.av_oracles {
         //     result.push(av_i.output_first_round(cpu_or_gpu));
@@ -99,11 +100,18 @@ impl<const N: usize, const B: usize, C: Curve + icicle_core::msm::MSM<C>> Auctio
         let cpu_or_gpu = get_device_is_cpu_or_gpu();
 
         // may influence efficiency
-        let mut result = Vec::new();
-        for av_i in &mut self.av_oracles {
-            result.push(av_i.output_second_round(cpu_or_gpu));
-        }
-        result
+        // let mut result = Vec::new();
+        // for av_i in &mut self.av_oracles {
+        //     result.push(av_i.output_second_round(cpu_or_gpu));
+        // }
+        // result
+
+        let projective_outputs = self.av_oracles
+                                     .par_iter_mut()
+                                     .map(|av| av.output_second_round(cpu_or_gpu))
+                                     .collect::<Vec<Projective<C>>>();
+
+        to_affine_batched(&projective_outputs)
     }
 }
 

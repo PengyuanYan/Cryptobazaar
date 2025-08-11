@@ -112,10 +112,10 @@ impl<const B: usize, C: Curve + icicle_core::msm::MSM<C>> AVOracle<B, C> {
         outputs[B-1] = projective_output;
 
         /*
-           0 -1 -1 -1
-           1  0 -1 -1
-           1  1  0 -1
-           1  1  1  0
+           b1 0 -1 -1 -1
+           b2 1  0 -1 -1
+           b3 1  1  0 -1
+           b4 1  1  1  0
         */
         for i in 0..(B - 1) {
             let idx = B - 2 - i;
@@ -130,17 +130,13 @@ impl<const B: usize, C: Curve + icicle_core::msm::MSM<C>> AVOracle<B, C> {
         outputs
     }
 
-    pub fn output_second_round(&mut self, cpu_or_gpu: usize) -> Affine::<C> {
+    pub fn output_second_round(&mut self, cpu_or_gpu: usize) -> Projective::<C> {
         assert_eq!(self.state, OracleState::Round2Completed);
         self.state = OracleState::Completed;
 
         let ones = vec![C::ScalarField::one(); B];
 
-        let projective_output = my_msm(&ones, &self.second_msgs, cpu_or_gpu);
-
-        let mut affine_output = Affine::<C>::zero();
-        C::to_affine(&projective_output, &mut affine_output);
-        affine_output
+        my_msm(&ones, &self.second_msgs, cpu_or_gpu)
     }
 }
 
@@ -152,7 +148,7 @@ mod av_oracle_tests {
     const B: usize = 1024;
 
     use icicle_bn254::curve::{CurveCfg as Bn254CurveCfg};
-    use icicle_core::curve::{Curve,Affine};
+    use icicle_core::curve::{Curve,Affine,Projective};
     use icicle_core::traits::GenerateRandom;
 
     use icicle_bn254::curve::ScalarCfg;
@@ -188,7 +184,7 @@ mod av_oracle_tests {
         }
 
         let output = av_oracle.output_second_round(0);
-        assert_eq!(output, Affine::<Bn254CurveCfg>::zero());
+        assert_eq!(output, Projective::<Bn254CurveCfg>::zero());
     }
 
     #[test]
@@ -226,6 +222,6 @@ mod av_oracle_tests {
         }
 
         let output = av_oracle.output_second_round(0);
-        assert_ne!(output, Affine::<Bn254CurveCfg>::zero());
+        assert_ne!(output, Projective::<Bn254CurveCfg>::zero());
     }
 }

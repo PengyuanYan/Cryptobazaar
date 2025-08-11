@@ -25,7 +25,7 @@ use criterion::{criterion_group, criterion_main, Criterion};
 
 /* RUN WITH: cargo bench --bench lderivative */
 
-const N: usize = 1024;
+const N: usize = 128;
 const B: usize = 1;
 
 fn prove<const N: usize, C1, C2, F, P>(
