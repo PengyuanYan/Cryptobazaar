@@ -8,6 +8,8 @@ use icicle_core::curve::{Curve, Projective, Affine};
 use icicle_core::{msm, msm::MSMConfig};
 use icicle_runtime::memory::{DeviceVec, HostSlice};
 
+use rayon::prelude::*;
+
 pub mod folding;
 pub mod srs;
 
@@ -261,4 +263,10 @@ pub fn my_msm<C: Curve + icicle_core::msm::MSM<C>>(scalars: &[C::ScalarField], b
     };
 
     msm_result
+}
+
+pub fn to_affine_batched<C: Curve>(input: &[Projective::<C>]) -> Vec<Affine::<C>> {
+    input.par_iter()
+         .map(|p| (*p).into())
+         .collect()
 }

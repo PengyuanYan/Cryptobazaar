@@ -17,6 +17,8 @@ rand = "0.8.5"
 
 criterion = { version = "0.4", features = ["html_reports"] }
 
+rayon = "1.8.0"
+
 [dev-dependencies]
 rand_chacha = "0.3.1"
 

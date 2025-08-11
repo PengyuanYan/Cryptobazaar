@@ -4,7 +4,7 @@ use icicle_core::traits::FieldImpl;
 use super::enums::{AVError, OracleState};
 use icicle_core::{msm, msm::MSMConfig};
 use icicle_runtime::memory::HostSlice;
-use crate::utils::{msm_gpu, my_msm, get_coeffs_of_poly, get_device_is_cpu_or_gpu};
+use crate::utils::{msm_gpu, my_msm, get_coeffs_of_poly, get_device_is_cpu_or_gpu, to_affine_batched};
 
 /////////////////////////////////////////////////////////////////////////////
 // This part directly uses the original code to ensure compatibility.
@@ -105,11 +105,11 @@ impl<const B: usize, C: Curve + icicle_core::msm::MSM<C>> AVOracle<B, C> {
                      else { C::ScalarField::one() })
         .collect();
 
-        let mut outputs = vec![Affine::<C>::zero(); B];
+        let mut outputs = vec![Projective::<C>::zero(); B];
 
         let projective_output = my_msm(&x, &self.first_msgs, cpu_or_gpu);
 
-        outputs[B-1] = projective_output.into();
+        outputs[B-1] = projective_output;
 
         /*
            0 -1 -1 -1
@@ -119,11 +119,13 @@ impl<const B: usize, C: Curve + icicle_core::msm::MSM<C>> AVOracle<B, C> {
         */
         for i in 0..(B - 1) {
             let idx = B - 2 - i;
-            let projective_output = outputs[idx + 1].to_projective() - self.first_msgs[idx + 1].to_projective() - self.first_msgs[idx].to_projective();
-            outputs[idx] = projective_output.into();
+            let projective_output = outputs[idx + 1] - self.first_msgs[idx + 1].to_projective() - self.first_msgs[idx].to_projective();
+            outputs[idx] = projective_output;
         }
 
         self.state = OracleState::Round2Ongoing;
+
+        let outputs = to_affine_batched(&outputs);
 
         outputs
     }
