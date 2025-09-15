@@ -4,6 +4,7 @@ use icicle_core::curve::{Curve, Projective};
 use icicle_bn254::curve::ScalarCfg;    
 use icicle_core::traits::GenerateRandom;
 use std::ops::Mul;
+use icicle_core::{msm, msm::MSMConfig};
 
 use cryptobazaar::utils::load_backend;
 use criterion::{criterion_group, criterion_main, Criterion};

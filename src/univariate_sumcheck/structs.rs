@@ -1,3 +1,4 @@
+// This file contains the Structs for univariate_sumcheck and corresponding serlization functions.
 use icicle_core::traits::FieldImpl;
 use icicle_core::curve::{Curve,Affine};
 use icicle_core::polynomials::UnivariatePolynomial;
@@ -96,7 +97,6 @@ impl<C: Curve> CanonicalDeserialize for Instance<C> {
         let mut sum_buf = vec![0u8; scalar_len];
         reader.read_exact(&mut sum_buf)?;
         let sum = C::ScalarField::from_bytes_le(&sum_buf);
-
 
         if matches!(validate, Validate::Yes) &&
             !C::is_on_curve(a_cm.to_projective()) &&

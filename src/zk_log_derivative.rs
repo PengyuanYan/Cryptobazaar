@@ -1,24 +1,19 @@
-/*
-    Given f(X) over domain of size N where b last evaluations are blinders
-    we want to prove some log derivative relation "R(X)" about first N - b evaluations
-
-    In other words: "prove that ∑1/(ß + f_i) = R(ß)"
-
-    Both prover and verifier run indexer which computes s(X) such that
-    s = [1, 1, ..., 0, 0, 0] (all 1 and then 0 last N - b evaluations)
-
-    1. Prover sends ¥, which is claimed to be inverse blinders sum, ¥ = ∑1/fi for i in [N - b, N]
-    2. Verifiers sends ß and computes R(ß)
-    3. Prover sends b(X) and q(X)
-    4. Verifier sends µ
-    5. Prover sends b(0), b(µ), q(µ), f(µ), s(µ)
-    6. Verifier sends separation challenge ¡
-    7. Prover sends kzg proofs [πs]
-    6. Verifier checks
-        1. [πs]
-        2. b(µ)(ß * s(µ) + f(µ)) - 1 = q(µ)zH(µ)
-        3. b(0) = (R(ß) + ¥)/N
-*/
+//! Zero-knowledge log-derivative check over a masked subset of an evaluation domain.
+//!
+//! We have a polynomial `f(X)` defined over an `N`-sized domain. The last `B` points are
+//! *blinders*. We want to prove, in zero knowledge, that for a random challenge `β`:
+//!
+//! ```text
+//!     Σ_{i=0}^{N-B-1} 1/(β + f_i)  =  R(β)
+//! ```
+//!
+//! where `R` is a public (or verifier-computed) rational function encoding the expected
+//! log-derivative relation. A selector `s(X)` masks the active rows: `s = 1` on the first
+//! `N-B` points and `0` on the last `B`.
+//!
+//! The prover commits to witness polynomials, transcript samples challenges,
+//! prover constructs helper polynomials `b(X)` and `q(X)` so that a single batched KZG
+//! opening enforces the relation at a random evaluation point.
 use icicle_core::curve::Curve;
 use icicle_core::pairing::Pairing;
 use icicle_core::traits::FieldImpl;
@@ -57,6 +52,8 @@ where
     C1: Pairing<C1, C2, F>,
     U: UnivariatePolynomial<Field = <C1 as Curve>::ScalarField>,
 {
+    /// Computes the selector polynomial `s(X)` with `1` on the first `N−B` rows and `0` on the
+    /// last `B`, commits to it with KZG, and returns the commitment.
     pub fn index_v(pk: &KzgPk<C1,C2,F>) -> VerifierIndex<C1> 
     where
         <<C1 as Curve>::ScalarField as FieldImpl>::Config: NTTDomain<<C1 as Curve>::ScalarField> + NTT<<C1 as Curve>::ScalarField, <C1 as Curve>::ScalarField>,
@@ -76,6 +73,8 @@ where
         VerifierIndex { s_cm: s_cm.into() }
     }
 
+    /// Precomputes `s(X)` in coefficient form and its evaluations on the coset domain via NTT,
+    /// so the prover can reuse them across proofs.
     pub fn index_p() -> ProverIndex<C1, U> 
     where
         <C1 as Curve>::ScalarField: Arithmetic,
@@ -102,6 +101,13 @@ where
         }
     }
 
+    /// Create a proof of the masked log-derivative identity.
+    ///
+    /// 1. Commit to witness polynomials (e.g., `f`).
+    /// 2. Sample challenges (`β`, `μ`, separation challenge).
+    /// 3. Build helper polynomials `b(X)` and `q(X)` tying `Σ 1/(β+f_i)` to the claimed `R(β)`
+    ///    while excluding the last `B` (via `s`).
+    /// 4. Open all polynomials at a random point and batch-verify with KZG.
     pub fn prove(
         index: &ProverIndex<C1, U>,
         v_index: &VerifierIndex<C1>,
@@ -116,13 +122,6 @@ where
         let cpu_or_gpu = get_device_is_cpu_or_gpu();
         let g = C1::ScalarField::from_u32(5u32);
 
-        let mut twist = vec![C1::ScalarField::zero(); N];
-        let mut pow = C1::ScalarField::one();
-        for i in 0..N {
-            twist[i] = pow;
-            pow = pow * g;
-        }
-        
         let mut f_coeffs = get_coeffs_of_poly(&witness.f);
 
         let cfg = NTTConfig::<C1::ScalarField>::default();
@@ -133,7 +132,7 @@ where
         //domain
         let mut f_coset_evals = my_ntt::<C1>(&f_coeffs, g, NTTDir::kForward, cpu_or_gpu);
 
-        let mut tr = Transcript::new(b"log-derivative");
+        let mut tr = Transcript::new_transcript(b"log-derivative");
         tr.send_v_index(v_index);
         tr.send_instance(instance);
 
@@ -142,17 +141,17 @@ where
             blinders[i] = blinders[i].inv();
         }
 
-        let mut gamma = C1::ScalarField::zero();
+        let mut sum = C1::ScalarField::zero();
         for i in 0..blinders.len() {
-            gamma = gamma + blinders[i];
+            sum = sum + blinders[i];
         }
 
-        tr.send_blinders_sum(&gamma);
-        let beta = tr.get_beta();
+        tr.send_blinders_sum(&sum);
+        let gamma = tr.get_beta();
 
         let mut b_evals = Vec::with_capacity(N - B);
         for i in 0..(N - B) {
-            b_evals.push((f_evals[i] + beta).inv());
+            b_evals.push((f_evals[i] + gamma).inv());
         }
         b_evals.append(&mut blinders);
         
@@ -174,7 +173,7 @@ where
             let f_i = f_coset_evals[i];
             let s_i = index.s_coset_evals[i];
 
-            let result = (b_i * (s_i * beta + f_i) - C1::ScalarField::one()) * zh_coset_inv;
+            let result = (b_i * (s_i * gamma + f_i) - C1::ScalarField::one()) * zh_coset_inv;
             q_coset_evals.push(result);
         }
         
@@ -209,7 +208,7 @@ where
         ).unwrap();
 
         Proof {
-            gamma,
+            sum,
             b_cm,
             q_cm,
             f_opening,
@@ -220,7 +219,8 @@ where
             q_1,
         }
     }
-
+    
+    /// Verify the realtion if hold by reconstructing the equation.
     pub fn verify<Func>(
         index: &VerifierIndex<C1>,
         instance: &Instance<C1>,
@@ -233,15 +233,15 @@ where
         <C1 as Curve>::ScalarField: Arithmetic,
         <<C1 as Curve>::ScalarField as FieldImpl>::Config: NTTDomain<<C1 as Curve>::ScalarField>
     {
-        let mut tr = Transcript::new(b"log-derivative");
+        let mut tr = Transcript::new_transcript(b"log-derivative");
         tr.send_v_index(index);
         tr.send_instance(instance);
 
-        tr.send_blinders_sum(&proof.gamma);
+        tr.send_blinders_sum(&proof.sum);
         let beta = tr.get_beta();
         let relation_at_beta = relation(beta);
         let b_0 =
-            (relation_at_beta + proof.gamma) * (C1::ScalarField::from_u32((N).try_into().unwrap()).inv());
+            (relation_at_beta + proof.sum) * (C1::ScalarField::from_u32((N).try_into().unwrap()).inv());
 
         tr.send_b_and_q(&proof.b_cm, &proof.q_cm);
         let mu = tr.get_mu();
@@ -283,6 +283,7 @@ where
             return Err(Error::Openings);
         }
         
+        // reconstruce the relation to checl if it hold.
         let formation_eq = {
             let zh_eval = mu.pow(N) - C1::ScalarField::one();
             proof.b_opening * (beta * proof.s_opening + proof.f_opening) - C1::ScalarField::one()
@@ -375,13 +376,12 @@ mod log_derivative_tests {
 
         let proof = Argument::<N, B, Bn254CurveCfg, Bn254G2CurveCfg, Bn254PairingFieldImpl, Bn254Poly>::prove(&index_p, &index_v, &instance, &witness, &pk);
 
-        /* */
         {
             let mut sum = Bn254ScalarField::zero();
             for i in 0..blinders_cloned.len() {
                 sum = sum + blinders_cloned[i].inv();
             }
-            assert_eq!(sum, proof.gamma);
+            assert_eq!(sum, proof.sum);
         }
 
         let result = Argument::<N, B, Bn254CurveCfg, Bn254G2CurveCfg, Bn254PairingFieldImpl, Bn254Poly>::verify(&index_v, &instance, &proof, &vk, &relation);

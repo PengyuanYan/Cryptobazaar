@@ -1,13 +1,13 @@
-/*
-    1. P sends [p] claimed to be correct folding of lagrange basis commitments given array of challenges {ch}
-    2. V sends ß
-    3. P
-        1. computes a(X) = ∑ß^iLi(X)
-        2. sends [a] and π (well formation proof of a)
-
-    4: P, V
-        Run univariate sumcheck to prove that ∑p_i * a_i = fold(ß)
-*/
+// this code directly used the origianl code
+//! Lagrange-basis folding with a univariate sumcheck and KZG-backed accumulator.
+//!
+//! Protocol sketch:
+//! 1. Prover sends a commitment `[p]` to the folded Lagrange basis using challenges `{ch_i}`.
+//! 2. Verifier samples a random `β` and the prover constructs `a(X) = Σ β^i · L_i(X)`.
+//! 3. Prover commits to `a(X)` and proves well-formedness of `a` via KZG;
+//! 4. Both parties run a univariate sumcheck to prove `Σ p_i · a_i = fold(β)`.
+//!
+//! This file wires the folding, accumulator commitment, and sumcheck together.
 
 use icicle_core::curve::{Curve, Affine, Projective};
 use icicle_core::traits::FieldImpl;
@@ -62,7 +62,7 @@ where
         <<C1 as Curve>::ScalarField as FieldImpl>::Config: NTT<<C1 as Curve>::ScalarField, <C1 as Curve>::ScalarField>,
     {  
         let cpu_or_gpu = get_device_is_cpu_or_gpu();
-        let mut tr = Transcript::<C1>::new(b"fold-lagrange");
+        let mut tr = Transcript::<C1>::new_transcript(b"fold-lagrange");
 
         let folding_coeffs = compute_folding_coeffs::<C1>(&instance.challenges);
         
@@ -153,7 +153,7 @@ where
         <C1 as Curve>::ScalarField: Arithmetic,
         <<C1 as Curve>::ScalarField as FieldImpl>::Config: NTTDomain<<C1 as Curve>::ScalarField>
     {
-        let mut tr = Transcript::<C1>::new(b"fold-lagrange");
+        let mut tr = Transcript::<C1>::new_transcript(b"fold-lagrange");
         let folding_coeffs = compute_folding_coeffs::<C1>(&instance.challenges);
 
         tr.send_p(&proof.p_cm);

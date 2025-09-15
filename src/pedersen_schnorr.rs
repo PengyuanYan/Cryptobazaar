@@ -1,3 +1,4 @@
+// This code directly used the orgial design.
 use icicle_core::curve::{Curve, Affine};
 use std::marker::PhantomData;
 use icicle_core::traits::Arithmetic;
@@ -11,20 +12,29 @@ pub mod structs;
 mod tr;
 
 /*
-    Given points P and H prove knowledge of opening of pedersen commitments
-    X = xQ + rH
+    Pedersen–Schnorr proof of knowledge
 
-    Round1:
-    p.1.1. samples (b_1, b_2)
-    p.1.2. sends R = b_1P + b_2H
+    Public data:
+      - Bases: P, H
+      - Commitment: X = x·P + r·H
+    Witness (prover’s secret): x, r
 
-    v.1.1 Sends random c
+    Goal: Prove knowledge of (x, r) such that X = x·P + r·H, without revealing them.
 
-    Round2:
-    p.2.1. sends z_1 = cx + b_1
-    p.2.1. sends z_2 = cr + b_2
+    Round 1  (Prover → Verifier)
+      1) Sample random blinds b1, b2.
+      2) Send R = b1·P + b2·H.
 
-    v.2.1 cX + R = z_1P + z_2H
+    Challenge  (Verifier → Prover)
+      3) Send random challenge c ∈ 𝔽.
+
+    Round 2  (Prover → Verifier)
+      4) Send z1 = c·x + b1
+      5) Send z2 = c·r + b2
+
+    Verification  (Verifier)
+      Check in the group:
+        c·X + R == z1·P + z2·H
 */
 
 pub struct Argument<C: Curve> {
@@ -40,7 +50,7 @@ impl<C: Curve> Argument<C> {
         <C as Curve>::ScalarField: Arithmetic,
         <<C as Curve>::ScalarField as FieldImpl>::Config: GenerateRandom<<C as Curve>::ScalarField>
     {
-        let mut tr = Transcript::<C>::new(b"pedersen-schnorr");
+        let mut tr = Transcript::<C>::new_transcript(b"pedersen-schnorr");
         tr.send_instance(instance);
         
         let random_scalars = <<C::ScalarField as FieldImpl>::Config as GenerateRandom<C::ScalarField>>::generate_random(2);
@@ -64,7 +74,7 @@ impl<C: Curve> Argument<C> {
     }
 
     pub fn verify(instance: &Instance<C>, proof: &Proof<C>) -> Result<(), Error> {
-        let mut tr = Transcript::<C>::new(b"pedersen-schnorr");
+        let mut tr = Transcript::<C>::new_transcript(b"pedersen-schnorr");
         tr.send_instance(instance);
 
         tr.send_blinder(&proof.blinder);

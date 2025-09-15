@@ -3,40 +3,45 @@ use merlin::Transcript as Tr;
 use std::marker::PhantomData;
 use std::sync::Mutex;
 
-/// Generic structure that serves same interface to all subprotocols
-/// Makes it thread safe
+// This module defines a generic, thread-safe wrapper around the Merlin transcript
+// The code is directly used from the original Cryptobazaar.
 pub struct TranscriptOracle<F: FieldImpl> {
-    tr: Mutex<Tr>,
+    transcript: Mutex<Tr>,
     challenge_buffer: Mutex<Vec<u8>>,
     _f: PhantomData<F>,
 }
 
 impl<F: FieldImpl> TranscriptOracle<F> {
-    pub fn new(init_label: &'static [u8]) -> Self {
-        let tr = Tr::new(init_label);
+    /// Create a new transcript with an initialization label.
+    pub fn new_transcript(init_label: &'static [u8]) -> Self {
+        let transcript = Tr::new(init_label);
         let challenge_size = F::zero().to_bytes_le().len();
         let challenge_buffer = vec![0u8; challenge_size];
         Self {
-            tr: Mutex::new(tr),
+            transcript: Mutex::new(transcript),
             challenge_buffer: Mutex::new(challenge_buffer),
             _f: PhantomData,
         }
     }
-
+    
+    // Append a message to the transcript under a given label.
+    // Used to commit public data into the Fiat–Shamir transcript.
     pub fn send_message(&mut self, label: &'static [u8], data: &[u8]) {
-        let mut tr = self.tr.lock().unwrap();
-        tr.append_message(label, data);
+        let mut transcript = self.transcript.lock().unwrap();
+        transcript.append_message(label, data);
     }
-
+    
+    // Sample a challenge from the transcript, labeled by `label`.
+    // The challenge is deterministically derived from the transcript state.
     pub fn squeeze_challenge(&mut self, label: &'static [u8]) -> F {
-        let mut tr = self.tr.lock().unwrap();
-        let mut ch_buffer = self.challenge_buffer.lock().unwrap();
+        let mut transcript = self.transcript.lock().unwrap();
+        let mut challenge_buffer = self.challenge_buffer.lock().unwrap();
 
-        tr.challenge_bytes(label, &mut ch_buffer);
+        transcript.challenge_bytes(label, &mut challenge_buffer);
         
         // only use the half of the bytes to make sure the from_bytes_le is not overwhelmed
-        let half = ch_buffer.len() / 2;
-        let first_half: &[u8] = &ch_buffer[..half];
+        let half = challenge_buffer.len() / 2;
+        let first_half: &[u8] = &challenge_buffer[..half];
         F::from_bytes_le(&first_half)
     }
 }

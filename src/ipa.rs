@@ -1,3 +1,10 @@
+//! Inner-Product Argument (IPA) with folding and batched KZG openings.
+//!
+//! This module implements a Bulletproofs-style IPA over a vector of scalars `a` and
+//! a vector of bases `b`, with a Pedersen blinding base `H`. The core recursion sends
+//! `L` and `R` messages, derives challenges `α`, and folds `(a, b)` at each round.
+//! After `log₂ N` rounds we reduce to a single scalar–point pair and then enforce the
+//! final Pedersen opening using a *verifiable folding sumcheck* sub-protocol.
 use icicle_core::curve::{Curve,Affine,Projective};
 use icicle_core::traits::FieldImpl;
 use icicle_core::pairing::Pairing;
@@ -35,6 +42,13 @@ pub enum Error {
     SanityMismatch { position: usize },
 }
 
+/// Driver for the IPA protocol over a length-`N` vector, using `LOG_N` rounds of folding.
+///
+/// Type parameters:
+/// - `N`: vector length power of two.
+/// - `LOG_N`: number of folding rounds.
+/// - `C1`, `C2`, `F`: pairing types and field backend.
+/// - `U`: polynomial type used by the sumcheck and KZG sub-protocol.
 pub struct InnerProduct<const N: usize, const LOG_N: usize, C1, C2, F, U>
 where
     C1: Curve,
@@ -54,6 +68,11 @@ where
     C1: Pairing<C1, C2, F>,
     U: UnivariatePolynomial<Field = <C1 as Curve>::ScalarField>,
 {
+    /// Prove an inner-product relation via recursive folding.
+    ///
+    /// Given an instance with bases `b`, Pedersen blinding base `H`, and a commitment `C`
+    /// to `⟨a, b⟩ + blinding·H`, the prover sends `(L_i, R_i)` and finally proves the folded
+    /// opening using a verifiable folding sumcheck.
     pub fn prove (
         instance: &Instance<N, C1>,
         witness: &Witness<N, C1>,
@@ -77,7 +96,7 @@ where
 
         let mut alphas = Vec::with_capacity(LOG_N);
 
-        let mut tr = Transcript::<N, LOG_N, C1>::new(b"ipa");
+        let mut tr = Transcript::<N, LOG_N, C1>::new_transcript(b"ipa");
         tr.send_instance(instance);
 
         let r = tr.get_r();
@@ -99,7 +118,8 @@ where
         }
 
         let mut b_folded = to_affine_batched(&b_folded);
-        
+
+        // Rescale basis elements: b_i' = r^i · b_i
         for round in 0..(LOG_N) as usize {
             assert_eq!(a_folded.len(), b_folded.len());
 
@@ -121,7 +141,8 @@ where
             }
         
             let chunk = std::cmp::max(1, (a_left.len() + avaliable_threads - 1) / avaliable_threads);
-
+            
+            // L_i = ⟨a_L, b_R⟩,   R_i = ⟨a_R, b_L⟩
             let l: Projective<C1> = a_left
                 .par_chunks(chunk)
                 .zip(b_right.par_chunks(chunk))
@@ -135,6 +156,8 @@ where
                 .reduce(|| Projective::<C1>::zero(), |acc, x| acc + x);
             
             let blinders = <<C1::ScalarField as FieldImpl>::Config as GenerateRandom<C1::ScalarField>>::generate_random(2);
+
+            // Add Pedersen blinders to hide `L` and `R` before sending.
             let blinder_l = blinders[0];
             let blinder_r = blinders[1];
 
@@ -163,7 +186,7 @@ where
             c_fold_projective = C1::mul_scalar(l_projective, alpha_inv) + c_fold_projective + C1::mul_scalar(r_projective, alpha);
         }
         
-        // sanity
+        // At the end of LOG_N rounds, we should be down to a single scalar and point.
         if a_folded.len() != 1 || b_folded.len() != 1 {
             return Err(Error::FoldWrongLength {
                 a_len: a_folded.len(),
@@ -222,6 +245,11 @@ where
         })
     }
 
+    /// Verify an inner-product argument proof.
+    ///
+    /// Recomputes transcript challenges, folds the commitment `C` using `(L_i, R_i)`, folds
+    /// the basis `b` consistently, and invokes the verifiable folding sumcheck to validate
+    /// the final Pedersen opening.
     pub fn verify(
         instance: &Instance<N, C1>,
         proof: &Proof<LOG_N, C1>,
@@ -234,7 +262,7 @@ where
         <U as UnivariatePolynomial>::FieldConfig: GenerateRandom<<C1 as Curve>::ScalarField>,
         <<C1 as Curve>::ScalarField as FieldImpl>::Config: NTTDomain<<C1 as Curve>::ScalarField>
     {
-        let mut tr = Transcript::<N, LOG_N, _>::new(b"ipa");
+        let mut tr = Transcript::<N, LOG_N, _>::new_transcript(b"ipa");
         tr.send_instance(instance);
         
         let r = tr.get_r();
@@ -274,6 +302,8 @@ where
         C1::to_affine(&c_fold_projective, &mut c_fold_affine);
 
         // now fold the basis b and check pedersen openings
+        // Fold the basis using α⁻¹ coefficients and verify the final Pedersen opening
+        // via the verifiable folding sumcheck sub-protocol.
         let fold_coeffs = compute_folding_coeffs::<C1>(&alpha_invs);
         
         let mut b_folded_projective = my_msm(&fold_coeffs, &b_rescaled, cpu_or_gpu);

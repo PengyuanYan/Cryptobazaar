@@ -1,3 +1,4 @@
+// Folding utilities used by inner-product arguments
 use icicle_core::curve::{Curve, Affine};
 use icicle_core::traits::FieldImpl;
 use icicle_core::traits::Arithmetic;
@@ -31,6 +32,10 @@ pub trait Fold {
     ) -> Result<Vec<Self::FoldType>, FoldError>;
 }
 
+// Scalar folding.
+//
+// Given vector `[l_0,...,l_{m-1}, r_0,...,r_{m-1}]` and challenge `ch`,
+// computes `[l_i + ch * r_i]` for all i.
 pub struct FFold<C: Curve>(C);
 
 impl<C: Curve> Fold for FFold<C>
@@ -54,7 +59,8 @@ where
         for i in 0..left.len() {
             let l = left[i];
             let r = right[i];
-
+            
+            // l_i + ch * r_i
             folded.push(l + r * ch);
         }
 
@@ -62,6 +68,13 @@ where
     }
 }
 
+/// Curve point folding.
+///
+/// Given points `[L_0,...,L_{m-1}, R_0,...,R_{m-1}]` and challenge `ch`,
+/// computes `[L_i + ch * R_i]` for all i.
+///
+/// The fold is done in projective form for efficiency, then
+/// converted back to affine using a batched conversion.
 pub struct AffFold<C: Curve>(C);
 
 impl<C: Curve> Fold for AffFold<C> {
@@ -80,10 +93,11 @@ impl<C: Curve> Fold for AffFold<C> {
         let affine_result: Vec<Affine::<C>> = {
             let mut tmp = Vec::with_capacity(left.len());
             for i in 0..left.len() {
+                // L_i + ch * R_i
                 let result_projective = left[i].to_projective() + C::mul_scalar(right[i].to_projective(), ch);
                 tmp.push(result_projective);
             }
-            
+            // Batch convert projectives to affines
             to_affine_batched(&tmp)
         };
 
@@ -91,6 +105,17 @@ impl<C: Curve> Fold for AffFold<C> {
     }
 }
 
+// Compute all folding coefficients given a sequence of challenges.
+// It is used to compute the \produt (1+\alpha) after the IPA.
+//
+// In IPA, after multiple folding rounds with challenges
+// `ch_1, ch_2, ..., ch_t`, each original element gets multiplied
+// by a product of selected challenges depending on its binary index.
+// This function precomputes those products.
+//
+// Example:
+// - For challenges [c1, c2], output coefficients are:
+//   [1, c2, c1, c1*c2]
 pub fn compute_folding_coeffs<C: Curve>(chs: &[C::ScalarField]) -> Vec<C::ScalarField>
 where
     <C as Curve>::ScalarField: Arithmetic,

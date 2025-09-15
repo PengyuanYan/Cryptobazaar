@@ -13,10 +13,27 @@ use rayon::prelude::*;
 pub mod folding;
 pub mod srs;
 
+// Returns `true` if `x` is a power of two (1, 2, 4, ...).
+// Returns `false` for `0`.
 pub fn is_pow_2(x: usize) -> bool {
-    (x & (x - 1)) == 0
+    x != 0 && (x & (x - 1)) == 0
 }
 
+
+// Evaluate the vanishing polynomial Z_H(X) = X^n - 1
+// over a coset of size k * n.
+//
+// - `n`: subgroup size (power of 2)
+// - `k`: coset extension factor (power of 2)
+//
+// Steps:
+// 1. Pick coset generator p = 5 which is hardcoded for Bn254.
+// 2. Get root of unity for domain k*n.
+// 3. Compute p^n.
+// 4. For each i in [0, k), evaluate:
+//    Z_H(p^n * wi^(i*n)) = p^n * wi^(i*n) - 1.
+//
+// Returns k evaluations as a vector.
 pub fn evaluate_vanishing_over_extended_coset<C: Curve>(n: usize, k: usize) -> Vec<C::ScalarField> 
 where 
     <C as Curve>::ScalarField: Arithmetic,
@@ -41,6 +58,7 @@ where
     modulus_zh_coset_evals
 }
 
+// This fuction is used to get all the coefficients of a polynomials.
 pub fn get_coeffs_of_poly<P>(poly: &P) -> Vec<P::Field>
 where
     P: UnivariatePolynomial,
@@ -55,7 +73,7 @@ where
     coeffs
 }
 
-// this function is reimplemented based on the source code of ark library
+// This function is reimplemented based on the source code of ark library
 pub fn evaluate_all_lagrange_coefficients<C: Curve>(domain: C::ScalarField, tau: C::ScalarField, n: usize) -> Vec<C::ScalarField>
 where
     <C as Curve>::ScalarField: Arithmetic,
@@ -106,8 +124,9 @@ where
     }
 }
 
+// This fucntion will used to load GPU backend.
 pub fn load_backend() {
-    //runtime::load_backend_from_env_or_default().unwrap();
+    //runtime::load_backend_from_env_or_default().unwrap(); // if you need GPU remove "//" before the code.
     let device_gpu = Device::new("CUDA", 0);
     let is_cuda_device_available = icicle_runtime::is_device_available(&device_gpu);
     if is_cuda_device_available {
@@ -132,6 +151,7 @@ pub fn load_backend() {
     }
 }
 
+// This function is used to query GPU or CPU is used.
 pub fn get_device_is_cpu_or_gpu() -> usize {
     let mut cpu_or_gpu: usize = 0;
     let device = icicle_runtime::get_active_device().unwrap();
@@ -147,13 +167,14 @@ pub fn get_device_is_cpu_or_gpu() -> usize {
     return cpu_or_gpu;
 }
 
+// This is the function that can run msm by GPU.
 pub fn msm_gpu<C: Curve + icicle_core::msm::MSM<C>>(scalars: &[C::ScalarField], bases: &[Affine::<C>], cfg: &MSMConfig) -> Projective::<C> {
     assert_eq!(scalars.len(), bases.len());
     
     let cfg = MSMConfig::default();
     let n: usize = scalars.len();
     let mut output_cpu = vec![Projective::<C>::zero(); 1];
-
+    
     let mut input_scalars_gpu =
         DeviceVec::<C::ScalarField>::device_malloc(n).expect("Failed to allocate device memory for scalars input");
     let mut input_bases_gpu =
@@ -161,6 +182,7 @@ pub fn msm_gpu<C: Curve + icicle_core::msm::MSM<C>>(scalars: &[C::ScalarField], 
     let mut output_gpu =
         DeviceVec::<Projective::<C>>::device_malloc(1).expect("Failed to allocate device memory for msm output");
     
+    // These are the expensive data transfer.
     input_scalars_gpu
         .copy_from_host(HostSlice::from_slice(&scalars))
         .expect("Failed to copy scalars data to GPU");
@@ -175,7 +197,8 @@ pub fn msm_gpu<C: Curve + icicle_core::msm::MSM<C>>(scalars: &[C::ScalarField], 
         &mut output_gpu[..],
     )
     .unwrap();
-
+    
+    // This also is the expensive data transfer.
     output_gpu
         .copy_to_host(HostSlice::from_mut_slice(&mut output_cpu))
         .expect("Failed to copy result data back to CPU");
@@ -183,6 +206,7 @@ pub fn msm_gpu<C: Curve + icicle_core::msm::MSM<C>>(scalars: &[C::ScalarField], 
     output_cpu[0]
 }
 
+// This is the function that can run ntt by GPU.
 pub fn ntt_gpu<C: Curve>(scalars: &[C::ScalarField], cfg: &NTTConfig<C::ScalarField>, direction: NTTDir) -> Vec<C::ScalarField>
 where
     <<C as Curve>::ScalarField as FieldImpl>::Config: NTT<<C as Curve>::ScalarField, <C as Curve>::ScalarField>
@@ -213,6 +237,7 @@ where
     coeffs
 }
 
+// This is the function that can run ntt by GPU or CPU based on the input bit.
 pub fn my_ntt<C: Curve>(scalars: &[C::ScalarField], coset_gen: C::ScalarField, direction: NTTDir, cpu_or_gpu: usize) -> Vec<C::ScalarField>
 where
     <<C as Curve>::ScalarField as FieldImpl>::Config: NTT<<C as Curve>::ScalarField, <C as Curve>::ScalarField>
@@ -221,10 +246,7 @@ where
 
     if coset_gen != C::ScalarField::one() {
         cfg.coset_gen = coset_gen;
-        //println!("not one");
-    } //else {
-    //    println!("is one");
-    //}
+    }
 
     let result_coeffs = if cpu_or_gpu == 0 {
         let mut output_scalars = vec![C::ScalarField::zero(); scalars.len()];
@@ -244,6 +266,7 @@ where
     result_coeffs
 }
 
+// This is the function that can run msm by GPU or CPU based on the input bit.
 pub fn my_msm<C: Curve + icicle_core::msm::MSM<C>>(scalars: &[C::ScalarField], bases: &[Affine::<C>], cpu_or_gpu: usize) -> Projective::<C> {
     let cfg = MSMConfig::default();
 
@@ -265,6 +288,7 @@ pub fn my_msm<C: Curve + icicle_core::msm::MSM<C>>(scalars: &[C::ScalarField], b
     msm_result
 }
 
+// This is the function that converts the points to affine in parallel.
 pub fn to_affine_batched<C: Curve>(input: &[Projective::<C>]) -> Vec<Affine::<C>> {
     input.par_iter()
          .map(|p| (*p).into())

@@ -9,9 +9,9 @@ pub struct Transcript<const N: usize, const LOG_N: usize, C: Curve> {
 }
 
 impl<const N: usize, const LOG_N: usize, C: Curve> Transcript<N, LOG_N, C> {
-    pub fn new(init_label: &'static [u8]) -> Self {
+    pub fn new_transcript(init_label: &'static [u8]) -> Self {
         Self {
-            tr: TranscriptOracle::new(init_label),
+            tr: TranscriptOracle::new_transcript(init_label),
         }
     }
 

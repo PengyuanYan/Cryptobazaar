@@ -1,3 +1,4 @@
+// This is the Oracle of Fiat-Shamir Transformaion for perdersen_schnorr.
 use icicle_core::curve::{Curve,Affine};
 use crate::transcript::TranscriptOracle;
 use super::structs::Instance;
@@ -9,9 +10,9 @@ pub struct Transcript<C: Curve> {
 }
 
 impl<C: Curve> Transcript<C> {
-    pub(crate) fn new(init_label: &'static [u8]) -> Self {
+    pub(crate) fn new_transcript(init_label: &'static [u8]) -> Self {
         Self {
-            tr: TranscriptOracle::new(init_label),
+            tr: TranscriptOracle::new_transcript(init_label),
         }
     }
 

@@ -1,3 +1,5 @@
+//! This module just implement the univariate_sumcheck in a non-interactive way.
+// This code directly used the orgial design.
 use icicle_core::curve::{Curve,Affine};
 use icicle_core::traits::FieldImpl;
 use icicle_core::pairing::Pairing;
@@ -47,7 +49,8 @@ where
         assert!(is_pow_2(n));
         Instance { n, a_cm, b_cm, sum }
     }
-
+    
+    // Construct the sumcheck equation.
     pub fn prove(
         witness: &Witness<C1, U>,
         instance: &Instance<C1>,
@@ -58,7 +61,7 @@ where
         <<C1 as Curve>::ScalarField as FieldImpl>::Config: NTTDomain<<C1 as Curve>::ScalarField>
     {
         assert!(is_pow_2(instance.n));
-        let mut tr = Transcript::new(b"univariate-sumcheck");
+        let mut tr = Transcript::new_transcript(b"univariate-sumcheck");
 
         tr.send_instance(instance);
 
@@ -75,6 +78,7 @@ where
 
         let domain_vanishing_poly = U::from_coeffs(HostSlice::from_slice(&vanishing_poly_coeffs), len);
         
+        // Computer the h(X) and g(X) by diviving the vanishing polynomial
         let (q, r) = ab.divide(&domain_vanishing_poly);
         
         let mut r_coeffs = get_coeffs_of_poly(&r);
@@ -117,7 +121,8 @@ where
             batch_opening_proof: pi,
         }
     }
-
+    
+    /// Verify the sumcheck equation by reconstructing it.
     pub fn verify(
         proof: &Proof<C1>,
         instance: &Instance<C1>,
@@ -142,7 +147,7 @@ where
             proof.q_opening,
         ];
 
-        let mut tr = Transcript::new(b"univariate-sumcheck");
+        let mut tr = Transcript::new_transcript(b"univariate-sumcheck");
 
         tr.send_instance(instance);
         tr.send_r_and_q(&proof.r_cm, &proof.q_cm);
@@ -169,7 +174,7 @@ where
 
         let lhs = proof.a_opening * proof.b_opening;
 
-        // check sumcheck relation
+        // check sumcheck relation by reconstructing the equation
         let rhs = {
             let n = C1::ScalarField::from_u32((instance.n).try_into().unwrap());
             let n_inv = n.inv();

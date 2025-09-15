@@ -1,3 +1,6 @@
+//! This Auctioneer module performs audit function of the protocl.
+//! 
+//! It act as an auctioneer to reconstruct everthing to check if the autioneer honest.
 use icicle_core::curve::{Curve,Affine,Projective};
 use icicle_core::{msm, msm::MSMConfig};
 use icicle_runtime::memory::HostSlice;
@@ -5,6 +8,7 @@ use icicle_core::traits::FieldImpl;
 use icicle_core::traits::Arithmetic;
 use crate::utils::{msm_gpu, my_msm, get_coeffs_of_poly, get_device_is_cpu_or_gpu};
 
+// The sturctures re use the origianl Cryptobazaar's code.
 #[derive(Debug)]
 pub enum Error {
     FirstRoundAuditFail,
@@ -12,6 +16,7 @@ pub enum Error {
     AuditFail { bid_at: usize, error_detail: Box<Error> },
 }
 
+// This is message buffer of previous message.
 pub struct AVAuditor<const B: usize, C: Curve + icicle_core::msm::MSM<C>> {
     pub(crate) first_round_msgs: [Affine::<C>; B],
     pub(crate) first_round_output: [Affine::<C>; B],
@@ -20,6 +25,8 @@ pub struct AVAuditor<const B: usize, C: Curve + icicle_core::msm::MSM<C>> {
 }
 
 impl<const B: usize, C: Curve + icicle_core::msm::MSM<C>> AVAuditor<B, C> {
+
+    /// Redo everthing an auctioneer should do and check if it can get the same results.
     pub fn audit(&self) -> Result<(), Error> 
     where
         C: Curve<ScalarField: Arithmetic>
@@ -31,24 +38,10 @@ impl<const B: usize, C: Curve + icicle_core::msm::MSM<C>> AVAuditor<B, C> {
         .collect();
 
         let mut outputs = vec![Affine::<C>::zero(); B];
-
+        
+        // do what an auctioneer should do in the first round.
         let cfg = MSMConfig::default();
         let cpu_or_gpu = get_device_is_cpu_or_gpu();
-
-        // let projective_output = if cpu_or_gpu == 0 {
-        //     let mut projective_output_v = [Projective::<C>::zero()];
-        //         msm::msm(
-        //             HostSlice::from_slice(&x),
-        //             HostSlice::from_slice(&self.first_round_msgs),
-        //             &cfg,
-        //             HostSlice::from_mut_slice(&mut projective_output_v),
-        //         )
-        //         .unwrap();
-
-        //         projective_output_v[0]
-        //     } else {
-        //         msm_gpu(&x, &self.first_round_msgs)
-        // };
 
         let projective_output = my_msm(&x, &self.first_round_msgs, cpu_or_gpu);
 
@@ -69,29 +62,16 @@ impl<const B: usize, C: Curve + icicle_core::msm::MSM<C>> AVAuditor<B, C> {
             C::to_affine(&projective_output, &mut affine_output);
             outputs[i] = affine_output;
         }
-
+        
         let first_round_result = outputs;
-
+        
+        // check if it can get the same result as the auctioneer.
         if first_round_result != self.first_round_output {
             return Err(Error::FirstRoundAuditFail);
         }
-
+        
+        // do what the auctionner should do in the second round.
         let ones = vec![C::ScalarField::one(); B];
-
-        // let projective_output = if cpu_or_gpu == 0 {
-        //     let mut projective_output_v = [Projective::<C>::zero()];
-        //         msm::msm(
-        //             HostSlice::from_slice(&x),
-        //             HostSlice::from_slice(&self.first_round_msgs),
-        //             &cfg,
-        //             HostSlice::from_mut_slice(&mut projective_output_v),
-        //         )
-        //         .unwrap();
-
-        //         projective_output_v[0]
-        //     } else {
-        //         msm_gpu(&x, &self.first_round_msgs)
-        // };
 
         let projective_output = my_msm(&x, &self.first_round_msgs, cpu_or_gpu);
 

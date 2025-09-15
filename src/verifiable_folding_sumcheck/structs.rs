@@ -1,3 +1,4 @@
+// This file contains the Structs for verifiable_folding_sumcheck and corresponding serlization functions.
 use icicle_core::traits::FieldImpl;
 use icicle_core::curve::{Curve,Affine};
 use icicle_core::polynomials::UnivariatePolynomial;
@@ -27,6 +28,7 @@ pub struct Instance<C: Curve> {
     pub challenges: Vec<C::ScalarField>,
 }
 
+// Check if data is valid
 impl<C: Curve> Valid for Instance<C> {
     fn check(&self) -> Result<(), SerializationError> {
         if !C::is_on_curve(self.p_base.to_projective()) &&
@@ -41,6 +43,7 @@ impl<C: Curve> Valid for Instance<C> {
     }
 }
 
+// Serializition function for Instance
 impl<C: Curve> CanonicalSerialize for Instance<C> {
     fn serialize_with_mode<W: Write>(
         &self,
@@ -79,6 +82,7 @@ impl<C: Curve> CanonicalSerialize for Instance<C> {
     }
 }
 
+// Derializition function for Instance
 impl<C: Curve> CanonicalDeserialize for Instance<C> {
     fn deserialize_with_mode<R: Read>(
         mut reader: R,
@@ -172,6 +176,7 @@ pub struct Proof<C: Curve> {
     pub(crate) batch_opening_proof: Affine::<C>,
 }
 
+// Check if data is valid
 impl<C: Curve> Valid for Proof<C> {
     fn check(&self) -> Result<(), SerializationError> {
         if !C::is_on_curve(self.s.to_projective()) &&
@@ -187,6 +192,7 @@ impl<C: Curve> Valid for Proof<C> {
     }
 }
 
+// Serializition function for Proof
 impl<C: Curve> CanonicalSerialize for Proof<C> {
     fn serialize_with_mode<W: Write>(
         &self,
@@ -227,6 +233,7 @@ impl<C: Curve> CanonicalSerialize for Proof<C> {
     }
 }
 
+// Derializition function for Proof
 impl<C: Curve> CanonicalDeserialize for Proof<C> {
     fn deserialize_with_mode<R: Read>(
         mut reader: R,

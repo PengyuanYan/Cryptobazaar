@@ -1,3 +1,4 @@
+// This file contains the Structs for Acc and corresponding serlization functions.
 use icicle_core::curve::{Curve,Affine};
 use icicle_core::polynomials::UnivariatePolynomial;
 use std::marker::PhantomData;
@@ -21,7 +22,7 @@ pub struct Instance<C: Curve> {
     pub acc_cm: Affine::<C>,
 }
 
-// this is just for make the code can be compiled
+// Check if data is valid
 impl<C: Curve> Valid for Instance<C> {
     fn check(&self) -> Result<(), SerializationError> {
         if !C::is_on_curve(self.acc_cm.to_projective()) {
@@ -31,6 +32,7 @@ impl<C: Curve> Valid for Instance<C> {
     }
 }
 
+// Serializition function for Instance
 impl<C: Curve> CanonicalSerialize for Instance<C> {
     fn serialize_with_mode<W: Write>(
         &self,
@@ -53,6 +55,7 @@ impl<C: Curve> CanonicalSerialize for Instance<C> {
     }
 }
 
+// Derializition function for Instance
 impl<C: Curve> CanonicalDeserialize for Instance<C> {
     fn deserialize_with_mode<R: Read>(
         mut reader: R,
@@ -107,6 +110,7 @@ pub struct Proof<C: Curve> {
     pub q_2: Affine::<C>,
 }
 
+// Check if data is valid
 impl<C: Curve> Valid for Proof<C> {
     fn check(&self) -> Result<(), SerializationError> {
         if !C::is_on_curve(self.q_0.to_projective()) {
@@ -122,6 +126,7 @@ impl<C: Curve> Valid for Proof<C> {
     }
 }
 
+// Serializition function for Proof
 impl<C: Curve> CanonicalSerialize for Proof<C> {
     fn serialize_with_mode<W: Write>(
         &self,
@@ -149,6 +154,7 @@ impl<C: Curve> CanonicalSerialize for Proof<C> {
     }
 }
 
+// Derializition function for Proof
 impl<C: Curve> CanonicalDeserialize for Proof<C> {
     fn deserialize_with_mode<R: Read>(
         mut reader: R,

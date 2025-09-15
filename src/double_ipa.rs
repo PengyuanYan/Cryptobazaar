@@ -1,3 +1,4 @@
+// this code directly uses the original code.
 use icicle_core::curve::{Curve,Affine,Projective};
 use icicle_core::traits::FieldImpl;
 use icicle_core::pairing::Pairing;
@@ -78,7 +79,7 @@ where
 
         let mut alpha_invs = Vec::with_capacity(LOG_N);
 
-        let mut tr = Transcript::<N, LOG_N, C1>::new(b"double-ipa");
+        let mut tr = Transcript::<N, LOG_N, C1>::new_transcript(b"double-ipa");
         tr.send_instance(instance);
 
         let r = tr.get_r();
@@ -278,7 +279,7 @@ where
         <<C1 as Curve>::ScalarField as FieldImpl>::Config: NTTDomain<<C1 as Curve>::ScalarField>,
     {
         let cpu_or_gpu = get_device_is_cpu_or_gpu();
-        let mut tr = Transcript::<N, LOG_N, _>::new(b"double-ipa");
+        let mut tr = Transcript::<N, LOG_N, _>::new_transcript(b"double-ipa");
         tr.send_instance(instance);
 
         let r = tr.get_r();

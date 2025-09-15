@@ -1,3 +1,4 @@
+//! The module provide the prove and vecrify fucntion of the proof pse.
 use icicle_core::curve::{Curve,Affine};
 use icicle_core::traits::FieldImpl;
 use icicle_core::pairing::Pairing;
@@ -40,6 +41,10 @@ where
     U: UnivariatePolynomial<Field = <C1 as Curve>::ScalarField>,
     <U as UnivariatePolynomial>::FieldConfig: GenerateRandom<<U as UnivariatePolynomial>::Field>,
 {
+    /// Sample a random blinder polynomial with a prescribed average.
+    ///
+    /// Generates a random coefficient vector of length `degree + 1` and sets the
+    /// constant term so that the average value over `n` points equals `sum / n`.
     pub fn sample_blinder(
         sum: C1::ScalarField,
         degree: usize,
@@ -58,6 +63,11 @@ where
         blinder
     }
 
+    /// Produce a verifiable folding sumcheck proof.
+    ///
+    /// Checks that the claimed sum over the evaluation domain matches the folded
+    /// relation by committing to polynomials and performing a KZG opening at a
+    /// random point sampled from the transcript.
     pub fn prove(
         instance: &Instance<C1>,
         witness: &Witness<C1, U>,
@@ -70,11 +80,13 @@ where
     {
         assert!(is_pow_2(instance.n));
         let cpu_or_gpu = get_device_is_cpu_or_gpu();
-        let mut tr = Transcript::new(b"verifiable-folding-sumcheck");
+        let mut tr = Transcript::new_transcript(b"verifiable-folding-sumcheck");
 
         tr.send_instance(instance);
 
-        let (b_1, b_2) = (<<U as UnivariatePolynomial>::FieldConfig as GenerateRandom<<U as UnivariatePolynomial>::Field>>::generate_random(1)[0], <<U as UnivariatePolynomial>::FieldConfig as GenerateRandom<<U as UnivariatePolynomial>::Field>>::generate_random(1)[0]);
+        let (b_1, b_2) = (<<U as UnivariatePolynomial>::FieldConfig as GenerateRandom<<U as UnivariatePolynomial>::Field>>::generate_random(1)[0],
+                          <<U as UnivariatePolynomial>::FieldConfig as GenerateRandom<<U as UnivariatePolynomial>::Field>>::generate_random(1)[0]);
+        
         let s = C1::mul_scalar(instance.p_base.to_projective(), b_1) + C1::mul_scalar(instance.h_base.to_projective(), b_2);
         
         let mut s_affine = Affine::<C1>::zero();
@@ -150,7 +162,8 @@ where
         //these need ntt domain
         let a_opening = witness.a.eval(&opening_challenge);
         let blinder_opening = blinder.eval(&opening_challenge);
-
+        
+        // compute g(X) and h(X) in of the sumcheck
         let r_opening = r_mod_x.eval(&opening_challenge);
         let q_opening = q.eval(&opening_challenge);
         
@@ -187,6 +200,10 @@ where
         }
     }
 
+    /// Verify a verifiable folding sumcheck proof.
+    ///
+    /// Recomputes transcript challenges, reconstructs the folded checks, and uses
+    /// KZG verification plus degree-bound checks to validate the batched opening.
     pub fn verify(
         instance: &Instance<C1>,
         proof: &Proof<C1>,
@@ -199,7 +216,7 @@ where
         <<C1 as Curve>::ScalarField as FieldImpl>::Config: NTTDomain<<C1 as Curve>::ScalarField>
     {
         let domain = get_root_of_unity::<C1::ScalarField>(instance.n.try_into().unwrap());
-        let mut tr = Transcript::new(b"verifiable-folding-sumcheck");
+        let mut tr = Transcript::new_transcript(b"verifiable-folding-sumcheck");
 
         tr.send_instance(instance);
         tr.send_blinders(&proof.s, &proof.blinder_cm);
@@ -270,9 +287,10 @@ where
             let pi = lagrange_evals[i];
             b_opening = b_opening + (bi * pi);
         }
-
+        
+        // The sumcheck part of the proof pse.
         let lhs = proof.blinder_opening + c * proof.a_opening * b_opening;
-
+        
         let rhs = {
             let n = C1::ScalarField::from_u32(instance.n as u32);
             let n_inv = n.inv();

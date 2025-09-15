@@ -1,3 +1,5 @@
+//! This funciton encapuslate the bid_encoder to provide a clean view.
+//! This code directly use the origianl code.
 use icicle_core::curve::{Curve,Affine};
 use icicle_core::pairing::Pairing;
 use icicle_core::traits::FieldImpl;
@@ -40,6 +42,7 @@ where
     C1: Pairing<C1, C2, F>,
     U: UnivariatePolynomial<Field = C1::ScalarField>,
 {
+    /// Construct a new `Bidder` with a provided KZG proving key.
     pub fn new(pk: KzgPk<C1, C2, F>) -> Self 
     where
         <<C1 as Curve>::ScalarField as FieldImpl>::Config: NTT<<C1 as Curve>::ScalarField, <C1 as Curve>::ScalarField>,
@@ -55,10 +58,13 @@ where
         }
     }
     
+    /// Encode a concrete bid and cache the resulting `BidEncoder`.
     pub fn encode<R: RngCore + SeedableRng>(&mut self, bid: usize, seed: R::Seed) {
         self.bid_encoder = Some(BidEncoder::encode::<R>(bid, seed));
     }
-
+    
+    /// Prove that the encoded bid is well-formed with respect to the gate system.
+    /// And coonstruct the proof of gate.
     pub fn construct_bid_well_formation_proof<R: RngCore + SeedableRng>(
         &self,
         seed: R::Seed,
@@ -72,12 +78,14 @@ where
         let witness: GatesWitness<C1, U> = bid_encoder.to_gate_witness::<R, U>(seed);
         GatesArgument::<N, P, C1, C2, F>::prove(&witness, &self.gv_index, &self.gp_index, &self.pk)
     }
-
+    
+    /// Compute the first-round messages for the AV protocol derived from the bid.
     pub fn first_round(&self) -> Vec<Affine::<C1>> {
         let bid_encoder = self.bid_encoder.as_ref().unwrap();
         bid_encoder.to_first_av_round()
     }
 
+    /// Compute the second-round messages for the AV protocol.
     pub fn second_round(&self, basis: &[Affine::<C1>]) -> Vec<Affine::<C1>>
     where 
         <C1 as Curve>::ScalarField: Arithmetic,

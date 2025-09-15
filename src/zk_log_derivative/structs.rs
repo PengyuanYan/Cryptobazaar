@@ -1,3 +1,4 @@
+// This file contains the Structs for Gates and corresponding serlization functions.
 use icicle_core::traits::FieldImpl;
 use icicle_core::curve::{Curve,Affine};
 use icicle_core::polynomials::UnivariatePolynomial;
@@ -22,6 +23,7 @@ pub struct VerifierIndex<C: Curve> {
     pub s_cm: Affine::<C>,
 }
 
+// Check if data is valid
 impl<C: Curve> Valid for VerifierIndex<C> {
     fn check(&self) -> Result<(), SerializationError> {
         if !C::is_on_curve(self.s_cm.to_projective()) {
@@ -31,6 +33,7 @@ impl<C: Curve> Valid for VerifierIndex<C> {
     }
 }
 
+// Serializition function for VerifierIndex
 impl<C: Curve> CanonicalSerialize for VerifierIndex<C> {
     fn serialize_with_mode<W: Write>(
         &self,
@@ -50,6 +53,7 @@ impl<C: Curve> CanonicalSerialize for VerifierIndex<C> {
     }
 }
 
+// Derializition function for VerifierIndex
 impl<C: Curve> CanonicalDeserialize for VerifierIndex<C> {
     fn deserialize_with_mode<R: Read>(
         mut reader: R,
@@ -87,6 +91,7 @@ pub struct Instance<C: Curve> {
     pub f_cm: Affine::<C>,
 }
 
+// Check if data is valid
 impl<C: Curve> Valid for Instance<C> {
     fn check(&self) -> Result<(), SerializationError> {
         if !C::is_on_curve(self.f_cm.to_projective()) {
@@ -96,6 +101,7 @@ impl<C: Curve> Valid for Instance<C> {
     }
 }
 
+// Serializition function for Instance
 impl<C: Curve> CanonicalSerialize for Instance<C> {
     fn serialize_with_mode<W: Write>(
         &self,
@@ -115,6 +121,7 @@ impl<C: Curve> CanonicalSerialize for Instance<C> {
     }
 }
 
+// Derializition function for Instance
 impl<C: Curve> CanonicalDeserialize for Instance<C> {
     fn deserialize_with_mode<R: Read>(
         mut reader: R,
@@ -149,7 +156,7 @@ where
 }
 
 pub struct Proof<C: Curve> {
-    pub gamma: C::ScalarField,
+    pub sum: C::ScalarField,
 
     pub b_cm: Affine::<C>,
     pub q_cm: Affine::<C>,
@@ -163,6 +170,7 @@ pub struct Proof<C: Curve> {
     pub q_1: Affine::<C>,
 }
 
+// Check if data is valid
 impl<C: Curve> Valid for Proof<C> {
     fn check(&self) -> Result<(), SerializationError> {
         if !C::is_on_curve(self.b_cm.to_projective()) &&
@@ -178,13 +186,14 @@ impl<C: Curve> Valid for Proof<C> {
     }
 }
 
+// Serializition function for Proof
 impl<C: Curve> CanonicalSerialize for Proof<C> {
     fn serialize_with_mode<W: Write>(
         &self,
         mut writer: W,
         _compress: Compress, // it cant change anything
     ) -> Result<(), SerializationError> {
-        writer.write_all(&self.gamma.to_bytes_le())?;
+        writer.write_all(&self.sum.to_bytes_le())?;
 
         writer.write_all(&self.b_cm.x.to_bytes_le())?;
         writer.write_all(&self.b_cm.y.to_bytes_le())?;
@@ -213,6 +222,7 @@ impl<C: Curve> CanonicalSerialize for Proof<C> {
     }
 }
 
+// Derializition function for Proof
 impl<C: Curve> CanonicalDeserialize for Proof<C> {
     fn deserialize_with_mode<R: Read>(
         mut reader: R,
@@ -222,9 +232,9 @@ impl<C: Curve> CanonicalDeserialize for Proof<C> {
         let scalar_len = C::ScalarField::zero().to_bytes_le().len();
         let base_len = C::BaseField::zero().to_bytes_le().len();
         
-        let mut gamma_buf = vec![0u8; scalar_len];
-        reader.read_exact(&mut gamma_buf)?;
-        let gamma = C::ScalarField::from_bytes_le(&gamma_buf);
+        let mut sum_buf = vec![0u8; scalar_len];
+        reader.read_exact(&mut sum_buf)?;
+        let sum = C::ScalarField::from_bytes_le(&sum_buf);
 
         let read_affine = |reader: &mut dyn Read| -> Result<Affine::<C>, std::io::Error> {
             let mut x_bytes = vec![0u8; base_len];
@@ -267,7 +277,7 @@ impl<C: Curve> CanonicalDeserialize for Proof<C> {
             return Err(SerializationError::InvalidData);
         }
 
-        Ok(Self { gamma,
+        Ok(Self { sum,
                   b_cm, q_cm,
                   f_opening, s_opening, b_opening, q_opening,
                   q_0, q_1,
@@ -289,7 +299,7 @@ mod serialize_test {
 
     #[test]
     fn test_serialize() {
-        let gamma = Bn254ScalarField::one() + Bn254ScalarField::one() + Bn254ScalarField::one();
+        let sum = Bn254ScalarField::one() + Bn254ScalarField::one() + Bn254ScalarField::one();
         let b_cm = Affine::<Bn254CurveCfg>::zero();
         let q_cm = Affine::<Bn254CurveCfg>::zero();
         
@@ -301,7 +311,7 @@ mod serialize_test {
         let q_0 = Affine::<Bn254CurveCfg>::zero();
         let q_1 = Affine::<Bn254CurveCfg>::zero();
 
-        let proof = Proof { gamma,
+        let proof = Proof { sum,
                             b_cm, q_cm,
                             f_opening, s_opening, b_opening, q_opening,
                             q_0, q_1,
@@ -313,7 +323,7 @@ mod serialize_test {
         let mut reader: &[u8] = &data;
         let result = Proof::<Bn254CurveCfg>::deserialize_with_mode(&mut reader, Compress::No, Validate::No).unwrap();
 
-        assert_eq!(result.gamma, gamma);
+        assert_eq!(result.sum, sum);
         assert_eq!(result.b_cm, b_cm);
         assert_eq!(result.b_opening, b_opening);
     }

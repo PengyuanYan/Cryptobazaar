@@ -1,18 +1,28 @@
+/*
+    This module shows that acc(X) evaluates evaluations are powers of µ
+    over the multiplicative subgroup H = {1, ω, ω^2, …, ω^{n-1}}.
+
+    Protocol:
+      1. P sends the commitment [acc] and a field element q.
+      2. V samples a challenge β.
+      3. P provides KZG openings of acc at x ∈ {1, β, ωβ} by sending:
+           q_0 for x = 1,
+           q_β and the evaluation acc(β),
+           q_{ωβ} and the evaluation acc(ωβ).
+      4. V checks:
+           all three KZG opening proofs, and
+           the relation (acc(ωβ) − μ · acc(β)) · (β − ω^{n−1}) = q · Z_H(β).
+    This code directly used the orgial design.
+*/
 use icicle_core::curve::{Curve};
 use icicle_core::pairing::Pairing;
 use icicle_core::traits::{FieldImpl, Arithmetic};
 use std::marker::PhantomData;
-
 use crate::kzg::{Kzg, PK as KzgPk, VK as KzgVk};
-
-use self::{
-    structs::{Error, Instance, Proof, Witness},
-    tr::Transcript,
-};
+use self::{structs::{Error, Instance, Proof, Witness},tr::Transcript,};
 
 use icicle_core::polynomials::UnivariatePolynomial;
 use icicle_core::ntt::NTTDomain;
-
 use icicle_runtime::memory::HostSlice;
 use icicle_core::ntt;
 
@@ -46,7 +56,7 @@ where
         <C1 as Curve>::ScalarField: Arithmetic,
         <<C1 as Curve>::ScalarField as FieldImpl>::Config: NTTDomain<<C1 as Curve>::ScalarField>
     {
-        let mut tr = Transcript::new(b"acc-transcript");
+        let mut tr = Transcript::new_transcript(b"acc-transcript");
         
         let n: usize = instance.n;
         let omega = ntt::get_root_of_unity::<C1::ScalarField>(n.try_into().unwrap());
@@ -68,17 +78,20 @@ where
         
         tr.send_q(&q);
         let beta = tr.get_beta();
-
+        
+        // Build divisor polynomials (X − 1)
         let coeffs_0 = [C1::ScalarField::zero() - C1::ScalarField::one(), C1::ScalarField::one()];
         let divisor_poly_0 = P::from_coeffs(HostSlice::from_slice(&coeffs_0), 2);
         let (q_0, _) = witness.acc.divide(&divisor_poly_0);
         let q_0 = Kzg::commit(&pk, &q_0).unwrap();
         
+        // Build divisor polynomials (X − β)
         let coeffs_1 = [C1::ScalarField::zero() - beta, C1::ScalarField::one()];
         let divisor_poly_1 = P::from_coeffs(HostSlice::from_slice(&coeffs_1), 2);
         let (q_1, _) = witness.acc.divide(&divisor_poly_1);
         let q_1 = Kzg::commit(&pk, &q_1).unwrap();
-
+        
+        // Build divisor polynomials (X − ωβ)
         let coeffs_2 = [C1::ScalarField::zero() - (beta * omega), C1::ScalarField::one()];
         let divisor_poly_2 = P::from_coeffs(HostSlice::from_slice(&coeffs_2), 2);
         let (q_2, _) = witness.acc.divide(&divisor_poly_2);
@@ -105,7 +118,7 @@ where
     {
         let n: usize = instance.n;
         let omega = ntt::get_root_of_unity::<C1::ScalarField>(n.try_into().unwrap());
-        let mut tr = Transcript::new(b"acc-transcript");
+        let mut tr = Transcript::new_transcript(b"acc-transcript");
         tr.send_instance(instance);
         tr.send_q(&proof.q);
         let beta = tr.get_beta();
@@ -135,7 +148,8 @@ where
         if !kzg_at_beta.is_ok() {
             return Err(Error::OpeningFailed);
         }
-
+        
+        // 3. Check opening at X = ωβ
         let kzg_at_beta_sh = Kzg::verify(
             &[instance.acc_cm],
             &[proof.acc_shifted_opening],

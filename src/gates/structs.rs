@@ -1,3 +1,4 @@
+// This file contains the Structs for Gates and corresponding serlization functions.
 use icicle_core::traits::FieldImpl;
 use icicle_core::curve::{Curve,Affine};
 use icicle_core::polynomials::UnivariatePolynomial;
@@ -21,7 +22,7 @@ pub struct VerifierIndex<C: Curve> {
     pub q_price_cm: Affine::<C>,
 }
 
-// this is just for make the code can be compiled
+// Check if data is valid
 impl<C: Curve> Valid for VerifierIndex<C> {
     fn check(&self) -> Result<(), SerializationError> {
         if !C::is_on_curve(self.q_price_cm.to_projective()) {
@@ -31,6 +32,7 @@ impl<C: Curve> Valid for VerifierIndex<C> {
     }
 }
 
+// Serializition function for VerifierIndex
 impl<C: Curve> CanonicalSerialize for VerifierIndex<C> {
     fn serialize_with_mode<W: Write>(
         &self,
@@ -50,6 +52,7 @@ impl<C: Curve> CanonicalSerialize for VerifierIndex<C> {
     }
 }
 
+// Derializition function for VerifierIndex
 impl<C: Curve> CanonicalDeserialize for VerifierIndex<C> {
     fn deserialize_with_mode<R: Read>(
         mut reader: R,
@@ -90,30 +93,30 @@ where
     P: UnivariatePolynomial<Field = C::ScalarField>,
 {
     pub bid: P,
-    pub f: P,
-    pub r: P,
-    pub r_inv: P,
-    pub diff: P,
-    pub g: P,
+    pub random_x: P,
+    pub random_r: P,
+    pub random_r_inv: P,
+    pub diff_f: P,
+    pub hidden_bid: P,
     pub e: PhantomData<C>,
 }
 
 pub struct Proof<C: Curve> {
     pub bid_cm: Affine::<C>,
-    pub r_cm: Affine::<C>,
-    pub r_inv_cm: Affine::<C>,
-    pub f_cm: Affine::<C>,
-    pub diff_cm: Affine::<C>,
-    pub g_cm: Affine::<C>,
+    pub random_r_cm: Affine::<C>,
+    pub random_r_inv_cm: Affine::<C>,
+    pub random_x_cm: Affine::<C>,
+    pub diff_f_cm: Affine::<C>,
+    pub hidden_bid_cm: Affine::<C>,
 
     pub q_price_opening: C::ScalarField,
     pub bid_opening: C::ScalarField,
     pub bid_shift_opening: C::ScalarField,
-    pub f_opening: C::ScalarField,
-    pub r_opening: C::ScalarField,
-    pub r_inv_opening: C::ScalarField,
-    pub diff_opening: C::ScalarField,
-    pub g_opening: C::ScalarField,
+    pub random_x_opening: C::ScalarField,
+    pub random_r_opening: C::ScalarField,
+    pub random_r_inv_opening: C::ScalarField,
+    pub diff_f_opening: C::ScalarField,
+    pub hidden_bid_opening: C::ScalarField,
 
     pub q_chunk_0_cm: Affine::<C>,
     pub q_chunk_1_cm: Affine::<C>,
@@ -125,14 +128,15 @@ pub struct Proof<C: Curve> {
     pub w_1: Affine::<C>,
 }
 
+// Check if data is valid
 impl<C: Curve> Valid for Proof<C> {
     fn check(&self) -> Result<(), SerializationError> {
         if !C::is_on_curve(self.bid_cm.to_projective()) &&
-           !C::is_on_curve(self.r_cm.to_projective()) &&
-           !C::is_on_curve(self.r_inv_cm.to_projective()) &&
-           !C::is_on_curve(self.f_cm.to_projective()) &&
-           !C::is_on_curve(self.diff_cm.to_projective()) &&
-           !C::is_on_curve(self.g_cm.to_projective()) &&
+           !C::is_on_curve(self.random_r_cm.to_projective()) &&
+           !C::is_on_curve(self.random_r_inv_cm.to_projective()) &&
+           !C::is_on_curve(self.random_x_cm.to_projective()) &&
+           !C::is_on_curve(self.diff_f_cm.to_projective()) &&
+           !C::is_on_curve(self.hidden_bid_cm.to_projective()) &&
 
            !C::is_on_curve(self.q_chunk_0_cm.to_projective()) &&
            !C::is_on_curve(self.q_chunk_1_cm.to_projective()) &&
@@ -147,6 +151,7 @@ impl<C: Curve> Valid for Proof<C> {
     }
 }
 
+// Serializition function for Proof
 impl<C: Curve> CanonicalSerialize for Proof<C> {
     fn serialize_with_mode<W: Write>(
         &self,
@@ -156,29 +161,29 @@ impl<C: Curve> CanonicalSerialize for Proof<C> {
         writer.write_all(&self.bid_cm.x.to_bytes_le())?;
         writer.write_all(&self.bid_cm.y.to_bytes_le())?;
 
-        writer.write_all(&self.r_cm.x.to_bytes_le())?;
-        writer.write_all(&self.r_cm.y.to_bytes_le())?;
+        writer.write_all(&self.random_r_cm.x.to_bytes_le())?;
+        writer.write_all(&self.random_r_cm.y.to_bytes_le())?;
 
-        writer.write_all(&self.r_inv_cm.x.to_bytes_le())?;
-        writer.write_all(&self.r_inv_cm.y.to_bytes_le())?;
+        writer.write_all(&self.random_r_inv_cm.x.to_bytes_le())?;
+        writer.write_all(&self.random_r_inv_cm.y.to_bytes_le())?;
 
-        writer.write_all(&self.f_cm.x.to_bytes_le())?;
-        writer.write_all(&self.f_cm.y.to_bytes_le())?;
+        writer.write_all(&self.random_x_cm.x.to_bytes_le())?;
+        writer.write_all(&self.random_x_cm.y.to_bytes_le())?;
 
-        writer.write_all(&self.diff_cm.x.to_bytes_le())?;
-        writer.write_all(&self.diff_cm.y.to_bytes_le())?;
+        writer.write_all(&self.diff_f_cm.x.to_bytes_le())?;
+        writer.write_all(&self.diff_f_cm.y.to_bytes_le())?;
 
-        writer.write_all(&self.g_cm.x.to_bytes_le())?;
-        writer.write_all(&self.g_cm.y.to_bytes_le())?;
+        writer.write_all(&self.hidden_bid_cm.x.to_bytes_le())?;
+        writer.write_all(&self.hidden_bid_cm.y.to_bytes_le())?;
 
         writer.write_all(&self.q_price_opening.to_bytes_le())?;
         writer.write_all(&self.bid_opening.to_bytes_le())?;
         writer.write_all(&self.bid_shift_opening.to_bytes_le())?;
-        writer.write_all(&self.f_opening.to_bytes_le())?;
-        writer.write_all(&self.r_opening.to_bytes_le())?;
-        writer.write_all(&self.r_inv_opening.to_bytes_le())?;
-        writer.write_all(&self.diff_opening.to_bytes_le())?;
-        writer.write_all(&self.g_opening.to_bytes_le())?;
+        writer.write_all(&self.random_x_opening.to_bytes_le())?;
+        writer.write_all(&self.random_r_opening.to_bytes_le())?;
+        writer.write_all(&self.random_r_inv_opening.to_bytes_le())?;
+        writer.write_all(&self.diff_f_opening.to_bytes_le())?;
+        writer.write_all(&self.hidden_bid_opening.to_bytes_le())?;
         
         writer.write_all(&self.q_chunk_0_cm.x.to_bytes_le())?;
         writer.write_all(&self.q_chunk_0_cm.y.to_bytes_le())?;
@@ -204,6 +209,7 @@ impl<C: Curve> CanonicalSerialize for Proof<C> {
     }
 }
 
+// Derializition function for Proof
 impl<C: Curve> CanonicalDeserialize for Proof<C> {
     fn deserialize_with_mode<R: Read>(
         mut reader: R,
@@ -224,11 +230,11 @@ impl<C: Curve> CanonicalDeserialize for Proof<C> {
         };
 
         let bid_cm = read_affine(&mut reader)?;
-        let r_cm = read_affine(&mut reader)?;
-        let r_inv_cm = read_affine(&mut reader)?;
-        let f_cm = read_affine(&mut reader)?;
-        let diff_cm = read_affine(&mut reader)?;
-        let g_cm = read_affine(&mut reader)?;
+        let random_r_cm = read_affine(&mut reader)?;
+        let random_r_inv_cm = read_affine(&mut reader)?;
+        let random_x_cm = read_affine(&mut reader)?;
+        let diff_f_cm = read_affine(&mut reader)?;
+        let hidden_bid_cm = read_affine(&mut reader)?;
 
         let mut q_price_opening_buf = vec![0u8; scalar_len];
         reader.read_exact(&mut q_price_opening_buf)?;
@@ -242,25 +248,25 @@ impl<C: Curve> CanonicalDeserialize for Proof<C> {
         reader.read_exact(&mut bid_shift_opening_buf)?;
         let bid_shift_opening = C::ScalarField::from_bytes_le(&bid_shift_opening_buf);
 
-        let mut f_opening_buf = vec![0u8; scalar_len];
-        reader.read_exact(&mut f_opening_buf)?;
-        let f_opening = C::ScalarField::from_bytes_le(&f_opening_buf);
+        let mut random_x_opening_buf = vec![0u8; scalar_len];
+        reader.read_exact(&mut random_x_opening_buf)?;
+        let random_x_opening = C::ScalarField::from_bytes_le(&random_x_opening_buf);
 
-        let mut r_opening_buf = vec![0u8; scalar_len];
-        reader.read_exact(&mut r_opening_buf)?;
-        let r_opening = C::ScalarField::from_bytes_le(&r_opening_buf);
+        let mut random_r_opening_buf = vec![0u8; scalar_len];
+        reader.read_exact(&mut random_r_opening_buf)?;
+        let random_r_opening = C::ScalarField::from_bytes_le(&random_r_opening_buf);
 
-        let mut r_inv_opening_buf = vec![0u8; scalar_len];
-        reader.read_exact(&mut r_inv_opening_buf)?;
-        let r_inv_opening = C::ScalarField::from_bytes_le(&r_inv_opening_buf);
+        let mut random_r_inv_opening_buf = vec![0u8; scalar_len];
+        reader.read_exact(&mut random_r_inv_opening_buf)?;
+        let random_r_inv_opening = C::ScalarField::from_bytes_le(&random_r_inv_opening_buf);
 
-        let mut diff_opening_buf = vec![0u8; scalar_len];
-        reader.read_exact(&mut diff_opening_buf)?;
-        let diff_opening = C::ScalarField::from_bytes_le(&diff_opening_buf);
+        let mut diff_f_opening_buf = vec![0u8; scalar_len];
+        reader.read_exact(&mut diff_f_opening_buf)?;
+        let diff_f_opening = C::ScalarField::from_bytes_le(&diff_f_opening_buf);
 
-        let mut g_opening_buf = vec![0u8; scalar_len];
-        reader.read_exact(&mut g_opening_buf)?;
-        let g_opening = C::ScalarField::from_bytes_le(&g_opening_buf);
+        let mut hidden_bid_opening_buf = vec![0u8; scalar_len];
+        reader.read_exact(&mut hidden_bid_opening_buf)?;
+        let hidden_bid_opening = C::ScalarField::from_bytes_le(&hidden_bid_opening_buf);
 
         let q_chunk_0_cm = read_affine(&mut reader)?;
         let q_chunk_1_cm = read_affine(&mut reader)?;
@@ -278,11 +284,11 @@ impl<C: Curve> CanonicalDeserialize for Proof<C> {
 
         if matches!(validate, Validate::Yes) &&
             !C::is_on_curve(bid_cm.to_projective()) &&
-            !C::is_on_curve(r_cm.to_projective()) &&
-            !C::is_on_curve(r_inv_cm.to_projective()) &&
-            !C::is_on_curve(f_cm.to_projective()) &&
-            !C::is_on_curve(diff_cm.to_projective()) &&
-            !C::is_on_curve(g_cm.to_projective()) &&
+            !C::is_on_curve(random_r_cm.to_projective()) &&
+            !C::is_on_curve(random_r_inv_cm.to_projective()) &&
+            !C::is_on_curve(random_x_cm.to_projective()) &&
+            !C::is_on_curve(diff_f_cm.to_projective()) &&
+            !C::is_on_curve(hidden_bid_cm.to_projective()) &&
 
             !C::is_on_curve(q_chunk_0_cm.to_projective()) &&
             !C::is_on_curve(q_chunk_1_cm.to_projective()) &&
@@ -293,8 +299,8 @@ impl<C: Curve> CanonicalDeserialize for Proof<C> {
             return Err(SerializationError::InvalidData);
         }
 
-        Ok(Self { bid_cm, r_cm, r_inv_cm, f_cm, diff_cm, g_cm,
-                  q_price_opening, bid_opening, bid_shift_opening, f_opening, r_opening, r_inv_opening, diff_opening, g_opening,
+        Ok(Self { bid_cm, random_r_cm, random_r_inv_cm, random_x_cm, diff_f_cm, hidden_bid_cm,
+                  q_price_opening, bid_opening, bid_shift_opening, random_x_opening, random_r_opening, random_r_inv_opening, diff_f_opening, hidden_bid_opening,
                   q_chunk_0_cm, q_chunk_1_cm,
                   q_chunk_0_opening, q_chunk_1_opening,
                   w_0, w_1
@@ -330,20 +336,20 @@ mod serialize_test {
 
         let proof = Proof::<Bn254CurveCfg> {
                             bid_cm: Bn254CurveCfg::generate_random_affine_points(1)[0],
-                            r_cm: Bn254CurveCfg::generate_random_affine_points(1)[0],
-                            r_inv_cm: Bn254CurveCfg::generate_random_affine_points(1)[0],
-                            f_cm: Bn254CurveCfg::generate_random_affine_points(1)[0],
-                            diff_cm: Bn254CurveCfg::generate_random_affine_points(1)[0],
-                            g_cm: Bn254CurveCfg::generate_random_affine_points(1)[0],
+                            random_r_cm: Bn254CurveCfg::generate_random_affine_points(1)[0],
+                            random_r_inv_cm: Bn254CurveCfg::generate_random_affine_points(1)[0],
+                            random_x_cm: Bn254CurveCfg::generate_random_affine_points(1)[0],
+                            diff_f_cm: Bn254CurveCfg::generate_random_affine_points(1)[0],
+                            hidden_bid_cm: Bn254CurveCfg::generate_random_affine_points(1)[0],
 
                             q_price_opening: ScalarCfg::generate_random(1)[0],
                             bid_opening: ScalarCfg::generate_random(1)[0],
                             bid_shift_opening: ScalarCfg::generate_random(1)[0],
-                            f_opening: ScalarCfg::generate_random(1)[0],
-                            r_opening: ScalarCfg::generate_random(1)[0],
-                            r_inv_opening: ScalarCfg::generate_random(1)[0],
-                            diff_opening: ScalarCfg::generate_random(1)[0],
-                            g_opening: ScalarCfg::generate_random(1)[0],
+                            random_x_opening: ScalarCfg::generate_random(1)[0],
+                            random_r_opening: ScalarCfg::generate_random(1)[0],
+                            random_r_inv_opening: ScalarCfg::generate_random(1)[0],
+                            diff_f_opening: ScalarCfg::generate_random(1)[0],
+                            hidden_bid_opening: ScalarCfg::generate_random(1)[0],
 
                             q_chunk_0_cm: Bn254CurveCfg::generate_random_affine_points(1)[0],
                             q_chunk_1_cm: Bn254CurveCfg::generate_random_affine_points(1)[0],
@@ -362,19 +368,19 @@ mod serialize_test {
         let result = Proof::<Bn254CurveCfg>::deserialize_with_mode(&mut reader, Compress::No, Validate::No).unwrap();
 
         assert_eq!(proof.bid_cm, result.bid_cm);
-        assert_eq!(proof.r_cm, result.r_cm);
-        assert_eq!(proof.r_inv_cm, result.r_inv_cm);
-        assert_eq!(proof.f_cm, result.f_cm);
-        assert_eq!(proof.diff_cm, result.diff_cm);
-        assert_eq!(proof.g_cm, result.g_cm);
+        assert_eq!(proof.random_r_cm, result.random_r_cm);
+        assert_eq!(proof.random_r_inv_cm, result.random_r_inv_cm);
+        assert_eq!(proof.random_x_cm, result.random_x_cm);
+        assert_eq!(proof.diff_f_cm, result.diff_f_cm);
+        assert_eq!(proof.hidden_bid_cm, result.hidden_bid_cm);
         assert_eq!(proof.q_price_opening, result.q_price_opening);
         assert_eq!(proof.bid_opening, result.bid_opening);
         assert_eq!(proof.bid_shift_opening, result.bid_shift_opening);
-        assert_eq!(proof.f_opening, result.f_opening);
-        assert_eq!(proof.r_opening, result.r_opening);
-        assert_eq!(proof.r_inv_opening, result.r_inv_opening);
-        assert_eq!(proof.diff_opening, result.diff_opening);
-        assert_eq!(proof.g_opening, result.g_opening);
+        assert_eq!(proof.random_x_opening, result.random_x_opening);
+        assert_eq!(proof.random_r_opening, result.random_r_opening);
+        assert_eq!(proof.random_r_inv_opening, result.random_r_inv_opening);
+        assert_eq!(proof.diff_f_opening, result.diff_f_opening);
+        assert_eq!(proof.hidden_bid_opening, result.hidden_bid_opening);
         assert_eq!(proof.q_chunk_0_cm, result.q_chunk_0_cm);
         assert_eq!(proof.q_chunk_1_cm, result.q_chunk_1_cm);
         assert_eq!(proof.q_chunk_0_opening, result.q_chunk_0_opening);

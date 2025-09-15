@@ -1,3 +1,4 @@
+// This file contains the Structs for doble_pedersen and corresponding serlization functions.
 use icicle_core::traits::FieldImpl;
 use icicle_core::curve::{Curve,Affine};
 

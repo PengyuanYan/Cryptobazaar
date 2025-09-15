@@ -1,4 +1,8 @@
-// Oracle that computes outputs of the rounds of AV
+//! Anonymous Veto per‑position oracle.
+//!
+//! An `AVOracle` encapsulates the state machine and arithmetic for a single
+//! auction position/bucket. `Auctioneer` push bidder messages
+//! into the oracle in two phases, and then extract the round outputs.
 use icicle_core::curve::{Curve,Affine,Projective};
 use icicle_core::traits::FieldImpl;
 use super::enums::{AVError, OracleState};
@@ -6,8 +10,7 @@ use icicle_core::{msm, msm::MSMConfig};
 use icicle_runtime::memory::HostSlice;
 use crate::utils::{msm_gpu, my_msm, get_coeffs_of_poly, get_device_is_cpu_or_gpu, to_affine_batched};
 
-/////////////////////////////////////////////////////////////////////////////
-// This part directly uses the original code to ensure compatibility.
+// this structure is directly used from the original code
 #[derive(Clone)]
 pub struct AVOracle<const B: usize, C: Curve> {
     state: OracleState,
@@ -28,51 +31,41 @@ impl<const B: usize, C: Curve + icicle_core::msm::MSM<C>> AVOracle<B, C> {
         }
     }
 
-    fn msg_validity(&self, msg: Affine::<C>, pos: usize) -> Result<(), AVError> {
-        let zero = Affine::<C>::zero();
-        if pos >= B {
-            return Err(AVError::WrongPosition(format!(
-                "AV: Position has to be less than {}",
-                B
-            )));
+    /// Returns the message bucket for the current round, or an error if sending is not allowed.
+    fn current_round_msgs(&self) -> Result<&[Affine<C>], AVError> {
+        let wrong = |s: &str| AVError::WrongState(format!("AV: Message can't be sent in {s} state"));
+
+        match self.state {
+            OracleState::Round1Ongoing => Ok(&self.first_msgs),
+            OracleState::Round2Ongoing => Ok(&self.second_msgs),
+            OracleState::Round1Completed => Err(wrong("Round1Completed")),
+            OracleState::Round2Completed => Err(wrong("Round2Completed")),
+            OracleState::Completed       => Err(wrong("Completed")),
         }
-        if msg == zero {
+    }
+
+    fn msg_validity(&self, msg: Affine<C>, pos: usize) -> Result<(), AVError> {
+        if pos >= B {
+            return Err(AVError::WrongPosition(format!("AV: Position must be < {}", B)));
+        }
+
+        if msg == Affine::<C>::zero() {
             return Err(AVError::WrongMsg(String::from("AV: Message can't be zero")));
         }
-        // assert that position is not already used
-        match self.state {
-            OracleState::Round1Ongoing => {
-                if self.first_msgs[pos] != zero {
-                    return Err(AVError::MsgAlreadySent(pos));
-                }
-            }
-            OracleState::Round2Ongoing => {
-                if self.second_msgs[pos] != zero {
-                    return Err(AVError::MsgAlreadySent(pos));
-                }
-            }
-            OracleState::Round1Completed => {
-                return Err(AVError::WrongState(String::from(
-                    "AV: Message can't be sent in Round1Completed state",
-                )))
-            }
-            OracleState::Round2Completed => {
-                return Err(AVError::WrongState(String::from(
-                    "AV: Message can't be sent in Round2Completed state",
-                )))
-            }
-            OracleState::Completed => {
-                return Err(AVError::WrongState(String::from(
-                    "AV: Message can't be sent in Completed state",
-                )))
-            }
+
+        // Ensure this position isn't already used for the active round.
+        let msgs = self.current_round_msgs()?;
+        if msgs[pos] != Affine::<C>::zero() {
+            return Err(AVError::MsgAlreadySent(pos));
         }
 
         Ok(())
     }
-
+    
+    /// Register an incoming bidder message, validating the current phase.
     pub fn register_msg(&mut self, msg: Affine::<C>, pos: usize) -> Result<(), AVError> {
         self.msg_validity(msg, pos)?;
+        // Route by phase and reject messages that don’t belong to the current phase.
         match self.state {
             OracleState::Round1Ongoing => {
                 self.first_msgs[pos] = msg;
@@ -95,48 +88,77 @@ impl<const B: usize, C: Curve + icicle_core::msm::MSM<C>> AVOracle<B, C> {
 
         Ok(())
     }
-////////////
-/////////////////////////////////////////////////////////////////////////////
+    
+    /// The core logic of anonymous veto round 1 and return the per‑position first‑round output.
+    /// It exploit the trick mentioned in Cryptobazaar.
     pub fn output_first_round(&mut self, cpu_or_gpu: usize) -> Vec<Affine::<C>> {
         assert_eq!(self.state, OracleState::Round1Completed);
+
+        let batched = 0; // if use the to_affine_batched function. 0 for no, 1 for yes.
 
         let mut x: Vec<C::ScalarField> = (0..B)
             .map(|i| if i == B - 1 { C::ScalarField::zero() }
                      else { C::ScalarField::one() })
         .collect();
+        
+        if batched == 1 {
+            let mut outputs = vec![Affine::<C>::zero(); B];
+            let projective_output = my_msm(&x, &self.first_msgs, cpu_or_gpu);
+            outputs[B-1] = projective_output.into();
 
-        let mut outputs = vec![Projective::<C>::zero(); B];
+            /*
+            b1 0 -1 -1 -1
+            b2 1  0 -1 -1
+            b3 1  1  0 -1
+            b4 1  1  1  0
+            */
+            for i in 0..(B - 1) {
+                let idx = B - 2 - i;
+                let projective_output = outputs[idx + 1].to_projective() - self.first_msgs[idx + 1].to_projective() - self.first_msgs[idx].to_projective();
+                outputs[idx] = projective_output.into();
+            }
 
-        let projective_output = my_msm(&x, &self.first_msgs, cpu_or_gpu);
+            self.state = OracleState::Round2Ongoing;
+            
+            return outputs;
+        } else {
+            let mut outputs = vec![Projective::<C>::zero(); B];
+            let projective_output = my_msm(&x, &self.first_msgs, cpu_or_gpu);
+            outputs[B-1] = projective_output;
 
-        outputs[B-1] = projective_output;
+            for i in 0..(B - 1) {
+                let idx = B - 2 - i;
+                let projective_output = outputs[idx + 1] - self.first_msgs[idx + 1].into() - self.first_msgs[idx].into();
+                outputs[idx] = projective_output;
+            }
 
-        /*
-           b1 0 -1 -1 -1
-           b2 1  0 -1 -1
-           b3 1  1  0 -1
-           b4 1  1  1  0
-        */
-        for i in 0..(B - 1) {
-            let idx = B - 2 - i;
-            let projective_output = outputs[idx + 1] - self.first_msgs[idx + 1].to_projective() - self.first_msgs[idx].to_projective();
-            outputs[idx] = projective_output;
+            self.state = OracleState::Round2Ongoing;
+
+            let outputs = to_affine_batched(&outputs);
+            return outputs;
         }
-
-        self.state = OracleState::Round2Ongoing;
-
-        let outputs = to_affine_batched(&outputs);
-
-        outputs
     }
-
-    pub fn output_second_round(&mut self, cpu_or_gpu: usize) -> Projective::<C> {
+    
+    /// Fininsh round 2 and return the per‑position second‑round result.
+    /// This one should used with the parallel caller.
+    pub fn output_second_round_parallel(&mut self, cpu_or_gpu: usize) -> Projective::<C> {
         assert_eq!(self.state, OracleState::Round2Completed);
         self.state = OracleState::Completed;
 
         let ones = vec![C::ScalarField::one(); B];
 
         my_msm(&ones, &self.second_msgs, cpu_or_gpu)
+    }
+    
+    /// Fininsh round 2 and return the per‑position second‑round result.
+    /// This one should used with the not parallel caller.
+    pub fn output_second_round_not_parallel(&mut self, cpu_or_gpu: usize) -> Affine::<C> {
+        assert_eq!(self.state, OracleState::Round2Completed);
+        self.state = OracleState::Completed;
+
+        let ones = vec![C::ScalarField::one(); B];
+
+        my_msm(&ones, &self.second_msgs, cpu_or_gpu).into()
     }
 }
 
@@ -183,8 +205,8 @@ mod av_oracle_tests {
             av_oracle.register_msg(second_msgs[i], i).unwrap();
         }
 
-        let output = av_oracle.output_second_round(0);
-        assert_eq!(output, Projective::<Bn254CurveCfg>::zero());
+        let output = av_oracle.output_second_round_not_parallel(0);
+        assert_eq!(output, Affine::<Bn254CurveCfg>::zero().into());
     }
 
     #[test]
@@ -208,7 +230,7 @@ mod av_oracle_tests {
 
         let round_outputs = av_oracle.output_first_round(0);
 
-        // at least one party picks a new secret
+        // the case that there is at least one party picks a new secret
         party_secrets[0] = ScalarCfg::generate_random(1)[0];
 
         let second_msgs: Vec<Affine::<Bn254CurveCfg>> = party_secrets
@@ -221,7 +243,7 @@ mod av_oracle_tests {
             av_oracle.register_msg(second_msgs[i], i).unwrap();
         }
 
-        let output = av_oracle.output_second_round(0);
-        assert_ne!(output, Projective::<Bn254CurveCfg>::zero());
+        let output = av_oracle.output_second_round_not_parallel(0);
+        assert_ne!(output, Affine::<Bn254CurveCfg>::zero().into());
     }
 }

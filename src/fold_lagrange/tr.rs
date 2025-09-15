@@ -1,3 +1,4 @@
+// This is the Oracle of Fiat-Shamir Transformaion for fold_lagrange.
 use icicle_core::curve::{Curve,Affine};
 use icicle_core::traits::FieldImpl;
 
@@ -8,9 +9,9 @@ pub struct Transcript<C: Curve> {
 }
 
 impl<C: Curve> Transcript<C> {
-    pub(crate) fn new(init_label: &'static [u8]) -> Self {
+    pub(crate) fn new_transcript(init_label: &'static [u8]) -> Self {
         Self {
-            tr: TranscriptOracle::new(init_label),
+            tr: TranscriptOracle::new_transcript(init_label),
         }
     }
 

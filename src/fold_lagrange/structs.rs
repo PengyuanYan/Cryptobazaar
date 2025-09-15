@@ -1,3 +1,4 @@
+//This is the struct for fold_lagrange
 use icicle_core::traits::FieldImpl;
 use icicle_core::curve::{Curve,Affine};
 

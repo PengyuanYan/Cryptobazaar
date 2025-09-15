@@ -1,3 +1,4 @@
+// This code directly used the orgial design.
 use icicle_core::curve::{Curve, Affine};
 use std::marker::PhantomData;
 use icicle_core::traits::Arithmetic;
@@ -11,24 +12,32 @@ pub mod structs;
 mod tr;
 
 /*
-    Given points Q, P and H prove knowledge of opening of pedersen commitments
-    1. X_1 = aQ + r_1H
-    2. X_2 = aP + r_2H
+    Double Pedersen–Schnorr protocol (linking a shared secret `a` across two commitments)
 
-    Round1:
-    p.1.1. samples (b_1, b_2, b_3)
-    p.1.2. sends R_1 = b_1Q + b_2H
-    p.1.3. sends R_2 = b_1P + b_3H
+    Public data:
+      - Bases: Q, P, H
+      - Commitments: X1 = a·Q + r1·H,  X2 = a·P + r2·H
+    Witness (prover’s secret): a, r1, r2
 
-    v.1.1 Sends random c
+    Goal: Prove knowledge of (a, r1, r2) such that the two equations above hold, without revealing them.
 
-    Round2:
-    p.2.1. sends z_1 = ca + b_1
-    p.2.1. sends z_2 = cr_1 + b_2
-    p.2.1. sends z_3 = cr_2 + b_3
+    Round 1  (Prover → Verifier)
+      1) Sample random blinds b1, b2, b3.
+      2) Send R1 = b1·Q + b2·H.
+      3) Send R2 = b1·P + b3·H.
 
-    v.2.1 cX_1 + R_1 = z_1Q + z_2H
-    v.2.2 cX_2 + R_2 = z_1P + z_3H
+    Challenge  (Verifier → Prover)
+      4) Send random challenge c ∈ 𝔽.
+
+    Round 2  (Prover → Verifier)
+      5) Send z1 = c·a  + b1
+      6) Send z2 = c·r1 + b2
+      7) Send z3 = c·r2 + b3
+
+    Verification  (Verifier)
+      Check both hold in the group:
+        c·X1 + R1 == z1·Q + z2·H
+        c·X2 + R2 == z1·P + z3·H
 */
 
 pub struct Argument<C: Curve> {
@@ -44,7 +53,7 @@ impl<C: Curve> Argument<C> {
         <C as Curve>::ScalarField: Arithmetic,
         <<C as Curve>::ScalarField as FieldImpl>::Config: GenerateRandom<<C as Curve>::ScalarField>
     {
-        let mut tr = Transcript::<C>::new(b"pedersen-schnorr");
+        let mut tr = Transcript::<C>::new_transcript(b"pedersen-schnorr");
         tr.send_instance(instance);
         
         let random_scalars = <<C::ScalarField as FieldImpl>::Config as GenerateRandom<C::ScalarField>>::generate_random(3);
@@ -82,7 +91,7 @@ impl<C: Curve> Argument<C> {
     }
 
     pub fn verify(instance: &Instance<C>, proof: &Proof<C>) -> Result<(), Error> {
-        let mut tr = Transcript::<C>::new(b"pedersen-schnorr");
+        let mut tr = Transcript::<C>::new_transcript(b"pedersen-schnorr");
         tr.send_instance(instance);
 
         tr.send_blinders(&proof.rand_1, &proof.rand_2);

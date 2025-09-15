@@ -1,12 +1,18 @@
-/*
-    All gates exist over q_price(X) which is selector that is 1 on |p| - price range entires
-    gate1: q_price(X)(r(X) * r_inv(X) - 1) = 0 mod zH(X)
-    gate2: q_price(X)(g(X) - f(X) - bid(X)*r(X)) = 0 mod zH(X)
-    gate3: q_price(X)(diff(X) - bid(X) + bid(wX)) = 0 mod zH(X)
-    gate4: L_p(X)bid(X) = 0 mod zH(X)
-
-    degree of quotient will be n - 1 + n - 1 + n - 1 - n = 3n - 3 - n = 2n - 3, so we can work with subgroup of 2n
-*/
+//! Gates argument over a 2N-domain with KZG commitments and NTT-based evaluation.
+//!
+//! This module builds and verifies a 4-gate arithmetic circuit used to tie together
+//! public/hidden bids with randomizers. All constraints are aggregated into a single
+//! quotient polynomial `q(X)` on an extended coset and committed with KZG.
+//!
+//! # Gates
+//! - **G1 (Inverse):** `q_price(X) · (r(X)·r_inv(X) − 1) = 0`
+//! - **G2 (Link):** `q_price(X) · (g(X) − f(X) − bid(X)·r(X)) = 0`
+//! - **G3 (Shift):** `q_price(X) · (diff(X) − bid(X) + bid(ωX)) = 0`
+//! - **G4 (Boundary):** `L_p(X) · bid(X) = 0`
+//!
+//! Here `q_price` selects the active price rows.
+//!
+//! degree of quotient will be n - 1 + n - 1 + n - 1 - n = 3n - 3 - n = 2n - 3
 use icicle_core::curve::Curve;
 use icicle_core::pairing::Pairing;
 use icicle_core::traits::FieldImpl;
@@ -53,6 +59,7 @@ where
     F: FieldImpl,
     C1: Pairing<C1, C2, F>,
 {
+    /// A helper function to constructe the selector vector
     fn make_q_price<U>() -> U
     where
         U: UnivariatePolynomial<Field = <C1 as Curve>::ScalarField>,
@@ -69,7 +76,8 @@ where
 
         U::from_coeffs(HostSlice::from_slice(&coeffs), N) 
     }
-
+    
+    /// A helper function for verifier to constructe the selector vector
     pub fn verifier_index<U>(pk: &KzgPk<C1,C2,F>) -> VerifierIndex<C1>
     where
         U: UnivariatePolynomial<Field = <C1 as Curve>::ScalarField>,
@@ -80,7 +88,8 @@ where
         let q_price_cm = Kzg::commit(pk, &q_price).unwrap();
         VerifierIndex { q_price_cm }
     }
-
+   
+    /// A helper function for the prover to construct get the vectors for proving.
     pub fn prover_index<U>() -> ProverIndex<C1, U> 
     where
         U: UnivariatePolynomial<Field = <C1 as Curve>::ScalarField>,
@@ -115,7 +124,8 @@ where
             l_p_coset_evals,
         }
     }
-
+    
+    // The function is used to construct the 4 gates and compute the quotient poly of the sum of the 4 gates.
     pub fn prove<U>(
         witness: &Witness<C1, U>,
         v_index: &VerifierIndex<C1>,
@@ -133,17 +143,17 @@ where
         
         let domain_n = get_root_of_unity::<C1::ScalarField>(N.try_into().unwrap());
 
-        let mut tr = Transcript::<C1>::new(b"gates-transcript");
+        let mut tr = Transcript::<C1>::new_transcript(b"gates-transcript");
         tr.send_index(v_index);
 
         let bid_cm = Kzg::commit(pk, &witness.bid).unwrap();
-        let f_cm = Kzg::commit(pk, &witness.f).unwrap();
-        let r_cm = Kzg::commit(pk, &witness.r).unwrap();
-        let r_inv_cm = Kzg::commit(pk, &witness.r_inv).unwrap();
-        let diff_cm = Kzg::commit(pk, &witness.diff).unwrap();
-        let g_cm = Kzg::commit(pk, &witness.g).unwrap();
+        let random_x_cm = Kzg::commit(pk, &witness.random_x).unwrap();
+        let random_r_cm = Kzg::commit(pk, &witness.random_r).unwrap();
+        let random_r_inv_cm = Kzg::commit(pk, &witness.random_r_inv).unwrap();
+        let diff_f_cm = Kzg::commit(pk, &witness.diff_f).unwrap();
+        let hidden_bid_cm = Kzg::commit(pk, &witness.hidden_bid).unwrap();
         
-        tr.send_oracle_commitments(&bid_cm, &f_cm, &r_cm, &r_inv_cm, &diff_cm, &g_cm);
+        tr.send_oracle_commitments(&bid_cm, &random_x_cm, &random_r_cm, &random_r_inv_cm, &diff_f_cm, &hidden_bid_cm);
         let alpha = tr.get_quotient_challenge();
         let alpha_pows: Vec<C1::ScalarField> = std::iter::successors(Some(C1::ScalarField::one()), |p| Some(*p * alpha)).take(4).collect();
 
@@ -156,40 +166,40 @@ where
         let bid_coset_evals = my_ntt::<C1>(&bid_coeffs, g, NTTDir::kForward, cpu_or_gpu);
         let bid_coset_evals = Oracle(&bid_coset_evals);
         
-        let mut f_coeffs = get_coeffs_of_poly(&witness.f);
-        f_coeffs.resize(k * N, C1::ScalarField::zero());
+        let mut random_x_coeffs = get_coeffs_of_poly(&witness.random_x);
+        random_x_coeffs.resize(k * N, C1::ScalarField::zero());
 
         //domain_kn
-        let f_coset_evals = my_ntt::<C1>(&f_coeffs, g, NTTDir::kForward, cpu_or_gpu);
-        let f_coset_evals = Oracle(&f_coset_evals);
+        let random_x_coset_evals = my_ntt::<C1>(&random_x_coeffs, g, NTTDir::kForward, cpu_or_gpu);
+        let random_x_coset_evals = Oracle(&random_x_coset_evals);
 
-        let mut r_coeffs = get_coeffs_of_poly(&witness.r);
-        r_coeffs.resize(k * N, C1::ScalarField::zero());
+        let mut random_r_coeffs = get_coeffs_of_poly(&witness.random_r);
+        random_r_coeffs.resize(k * N, C1::ScalarField::zero());
 
         //domain_kn
-        let r_coset_evals = my_ntt::<C1>(&r_coeffs, g, NTTDir::kForward, cpu_or_gpu);
-        let r_coset_evals = Oracle(&r_coset_evals);
+        let random_r_coset_evals = my_ntt::<C1>(&random_r_coeffs, g, NTTDir::kForward, cpu_or_gpu);
+        let random_r_coset_evals = Oracle(&random_r_coset_evals);
 
-        let mut r_inv_coeffs = get_coeffs_of_poly(&witness.r_inv);
-        r_inv_coeffs.resize(k * N, C1::ScalarField::zero());
+        let mut random_r_inv_coeffs = get_coeffs_of_poly(&witness.random_r_inv);
+        random_r_inv_coeffs.resize(k * N, C1::ScalarField::zero());
         
         //domain_kn
-        let r_inv_coset_evals = my_ntt::<C1>(&r_inv_coeffs, g, NTTDir::kForward, cpu_or_gpu);
-        let r_inv_coset_evals = Oracle(&r_inv_coset_evals);
+        let random_r_inv_coset_evals = my_ntt::<C1>(&random_r_inv_coeffs, g, NTTDir::kForward, cpu_or_gpu);
+        let random_r_inv_coset_evals = Oracle(&random_r_inv_coset_evals);
 
-        let mut diff_coeffs = get_coeffs_of_poly(&witness.diff);
-        diff_coeffs.resize(k * N, C1::ScalarField::zero());
-
-        //domain_kn
-        let diff_coset_evals = my_ntt::<C1>(&diff_coeffs, g, NTTDir::kForward, cpu_or_gpu);
-        let diff_coset_evals = Oracle(&diff_coset_evals);
-
-        let mut g_coeffs = get_coeffs_of_poly(&witness.g);
-        g_coeffs.resize(k * N, C1::ScalarField::zero());
+        let mut diff_f_coeffs = get_coeffs_of_poly(&witness.diff_f);
+        diff_f_coeffs.resize(k * N, C1::ScalarField::zero());
 
         //domain_kn
-        let g_coset_evals = my_ntt::<C1>(&g_coeffs, g, NTTDir::kForward, cpu_or_gpu);
-        let g_coset_evals = Oracle(&g_coset_evals);
+        let diff_f_coset_evals = my_ntt::<C1>(&diff_f_coeffs, g, NTTDir::kForward, cpu_or_gpu);
+        let diff_f_coset_evals = Oracle(&diff_f_coset_evals);
+
+        let mut hidden_bid_coeffs = get_coeffs_of_poly(&witness.hidden_bid);
+        hidden_bid_coeffs.resize(k * N, C1::ScalarField::zero());
+
+        //domain_kn
+        let hidden_bid_coset_evals = my_ntt::<C1>(&hidden_bid_coeffs, g, NTTDir::kForward, cpu_or_gpu);
+        let hidden_bid_coset_evals = Oracle(&hidden_bid_coset_evals);
 
         let q_price_coset_evals = Oracle(&index.q_price_coset_evals);
         let l_p_coset_evals = Oracle(&index.l_p_coset_evals);
@@ -205,34 +215,41 @@ where
         let mut q_coset_evals = vec![C1::ScalarField::zero(); k * N];
         let one = C1::ScalarField::one();
         
-        // structure is directly used from original code
-        for i in 0..(k * N) {
+        // computes the qutotient poly for the four gates
+        let compute_q_for = |i: usize| -> <C1 as Curve>::ScalarField {
             let q_price_i = q_price_coset_evals.query(i, 0, k);
             let bid_i = bid_coset_evals.query(i, 0, k);
-            let bid_i_next = bid_coset_evals.query(i, 1, k);
-            let r_i = r_coset_evals.query(i, 0, k);
-            let r_inv_i = r_inv_coset_evals.query(i, 0, k);
-            let f_i = f_coset_evals.query(i, 0, k);
-            let diff_i = diff_coset_evals.query(i, 0, k);
-            let g_i = g_coset_evals.query(i, 0, k);
+            let bid_i_next = bid_coset_evals.query(i, 1, k); // value at w·X
+            let random_r_i = random_r_coset_evals.query(i, 0, k);
+            let random_r_inv_i = random_r_inv_coset_evals.query(i, 0, k);
+            let random_x_i = random_x_coset_evals.query(i, 0, k);
+            let diff_f_i  = diff_f_coset_evals.query(i, 0, k);
+            let hidden_bid_i = hidden_bid_coset_evals.query(i, 0, k);
             let l_p_i = l_p_coset_evals.query(i, 0, k);
 
-            // gate1
-            q_coset_evals[i] = alpha_pows[0] * q_price_i * (r_i * r_inv_i - one);
+            // Gate 1: q_price * (r * r_inv - 1)
+            let g1 = alpha_pows[0] * q_price_i * (random_r_i * random_r_inv_i - one);
 
-            // gate2
-            q_coset_evals[i] = q_coset_evals[i] + (alpha_pows[1] * q_price_i * (g_i - f_i - bid_i * r_i));
+            // Gate 2: q_price * (g - f - bid * r)
+            let g2 = alpha_pows[1] * q_price_i * (hidden_bid_i - random_x_i - bid_i * random_r_i);
 
-            // gate3
-            q_coset_evals[i] = q_coset_evals[i] + (alpha_pows[2] * q_price_i * (diff_i - bid_i + bid_i_next));
+            // Gate 3: q_price * (diff - bid + bid(w·X))
+            let g3 = alpha_pows[2] * q_price_i * (diff_f_i - bid_i + bid_i_next);
 
-            // gate4
-            q_coset_evals[i] = q_coset_evals[i] + (alpha_pows[3] * l_p_i * bid_i);
+            // Gate 4: L_p * bid  (activates only at position p)
+            let g4 = alpha_pows[3] * l_p_i * bid_i;
 
-            // rescale by zh_inv
+            // Rescale by the vanishing polynomial on the extended domain.
             let zh_inv_i = modulus_zh_coset_evals_inv[i % k];
-            q_coset_evals[i] = q_coset_evals[i] * zh_inv_i
-        }
+
+            (g1 + g2 + g3 + g4) * zh_inv_i
+        };
+
+        // Fill q_coset_evals using the closure above.
+        q_coset_evals
+            .iter_mut()
+            .enumerate()
+            .for_each(|(i, q)| *q = compute_q_for(i));
         
         //domain_kn
         let q = my_ntt::<C1>(&q_coset_evals, g, NTTDir::kInverse, cpu_or_gpu);
@@ -252,11 +269,11 @@ where
         let q_price_opening = index.q_price.eval(&gamma);
         let bid_opening = witness.bid.eval(&gamma);
         let bid_shift_opening = witness.bid.eval(&(gamma * domain_n));
-        let f_opening = witness.f.eval(&gamma);
-        let r_opening = witness.r.eval(&gamma);
-        let r_inv_opening = witness.r_inv.eval(&gamma);
-        let diff_opening = witness.diff.eval(&gamma);
-        let g_opening = witness.g.eval(&gamma);
+        let random_x_opening = witness.random_x.eval(&gamma);
+        let random_r_opening = witness.random_r.eval(&gamma);
+        let random_r_inv_opening = witness.random_r_inv.eval(&gamma);
+        let diff_f_opening = witness.diff_f.eval(&gamma);
+        let hidden_bid_opening = witness.hidden_bid.eval(&gamma);
         let q_chunk_0_opening = q_chunk_0.eval(&gamma);
         let q_chunk_1_opening = q_chunk_1.eval(&gamma);
 
@@ -264,11 +281,11 @@ where
             &q_price_opening,
             &bid_opening,
             &bid_shift_opening,
-            &f_opening,
-            &r_opening,
-            &r_inv_opening,
-            &diff_opening,
-            &g_opening,
+            &random_x_opening,
+            &random_r_opening,
+            &random_r_inv_opening,
+            &diff_f_opening,
+            &hidden_bid_opening,
             &q_chunk_0_opening,
             &q_chunk_1_opening,
         );
@@ -280,11 +297,11 @@ where
             &[
                 index.q_price.clone(),
                 witness.bid.clone(),
-                witness.f.clone(),
-                witness.r.clone(),
-                witness.r_inv.clone(),
-                witness.diff.clone(),
-                witness.g.clone(),
+                witness.random_x.clone(),
+                witness.random_r.clone(),
+                witness.random_r_inv.clone(),
+                witness.diff_f.clone(),
+                witness.hidden_bid.clone(),
                 q_chunk_0.clone(),
                 q_chunk_1.clone(),
             ],
@@ -296,19 +313,19 @@ where
 
         Proof {
             bid_cm,
-            r_cm,
-            r_inv_cm,
-            f_cm,
-            diff_cm,
-            g_cm,
+            random_r_cm,
+            random_r_inv_cm,
+            random_x_cm,
+            diff_f_cm,
+            hidden_bid_cm,
             q_price_opening,
             bid_opening,
             bid_shift_opening,
-            f_opening,
-            r_opening,
-            r_inv_opening,
-            diff_opening,
-            g_opening,
+            random_x_opening,
+            random_r_opening,
+            random_r_inv_opening,
+            diff_f_opening,
+            hidden_bid_opening,
             q_chunk_0_cm,
             q_chunk_1_cm,
             q_chunk_0_opening,
@@ -317,7 +334,8 @@ where
             w_1,
         }
     }
-
+    
+    // Check the 4 gates relation hold by reconstruct it.
     pub fn verify(
         index: &VerifierIndex<C1>,
         proof: &Proof<C1>,
@@ -328,16 +346,16 @@ where
         <C1 as Curve>::ScalarField: Arithmetic
     {
         let domain = get_root_of_unity::<C1::ScalarField>(N.try_into().unwrap());
-        let mut tr = Transcript::<C1>::new(b"gates-transcript");
+        let mut tr = Transcript::<C1>::new_transcript(b"gates-transcript");
         tr.send_index(index);
 
         tr.send_oracle_commitments(
             &proof.bid_cm,
-            &proof.f_cm,
-            &proof.r_cm,
-            &proof.r_inv_cm,
-            &proof.diff_cm,
-            &proof.g_cm,
+            &proof.random_x_cm,
+            &proof.random_r_cm,
+            &proof.random_r_inv_cm,
+            &proof.diff_f_cm,
+            &proof.hidden_bid_cm,
         );
         let alpha = tr.get_quotient_challenge();
         let alpha_pows: Vec<C1::ScalarField> = std::iter::successors(Some(C1::ScalarField::one()), |p| Some(*p * alpha)).take(4).collect();
@@ -349,11 +367,11 @@ where
             &proof.q_price_opening,
             &proof.bid_opening,
             &proof.bid_shift_opening,
-            &proof.f_opening,
-            &proof.r_opening,
-            &proof.r_inv_opening,
-            &proof.diff_opening,
-            &proof.g_opening,
+            &proof.random_x_opening,
+            &proof.random_r_opening,
+            &proof.random_r_inv_opening,
+            &proof.diff_f_opening,
+            &proof.hidden_bid_opening,
             &proof.q_chunk_0_opening,
             &proof.q_chunk_1_opening,
         );
@@ -364,22 +382,22 @@ where
             &[
                 index.q_price_cm,
                 proof.bid_cm,
-                proof.f_cm,
-                proof.r_cm,
-                proof.r_inv_cm,
-                proof.diff_cm,
-                proof.g_cm,
+                proof.random_x_cm,
+                proof.random_r_cm,
+                proof.random_r_inv_cm,
+                proof.diff_f_cm,
+                proof.hidden_bid_cm,
                 proof.q_chunk_0_cm,
                 proof.q_chunk_1_cm,
             ],
             &[
                 proof.q_price_opening,
                 proof.bid_opening,
-                proof.f_opening,
-                proof.r_opening,
-                proof.r_inv_opening,
-                proof.diff_opening,
-                proof.g_opening,
+                proof.random_x_opening,
+                proof.random_r_opening,
+                proof.random_r_inv_opening,
+                proof.diff_f_opening,
+                proof.hidden_bid_opening,
                 proof.q_chunk_0_opening,
                 proof.q_chunk_1_opening,
             ],
@@ -418,19 +436,20 @@ where
         };
 
         let gamma_pow_n = gamma.pow(N);
-
+        
+        // check the 4 gates relation
         let lhs = {
             let g1 = alpha_pows[0]
                 * proof.q_price_opening
-                * (proof.r_opening * proof.r_inv_opening - C1::ScalarField::one());
+                * (proof.random_r_opening * proof.random_r_inv_opening - C1::ScalarField::one());
 
             let g2 = alpha_pows[1]
                 * proof.q_price_opening
-                * (proof.g_opening - proof.f_opening - proof.bid_opening * proof.r_opening);
+                * (proof.hidden_bid_opening - proof.random_x_opening - proof.bid_opening * proof.random_r_opening);
 
             let g3 = alpha_pows[2]
                 * proof.q_price_opening
-                * (proof.diff_opening - proof.bid_opening + proof.bid_shift_opening);
+                * (proof.diff_f_opening - proof.bid_opening + proof.bid_shift_opening);
 
             let g4 = alpha_pows[3] * l_p_next_at_gamma * proof.bid_opening;
 

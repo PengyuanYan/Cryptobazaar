@@ -1,28 +1,18 @@
+// This is the Oracle of Fiat-Shamir Transformaion for univariate sumcheck.
 use icicle_core::curve::{Curve,Affine};
 use crate::transcript::TranscriptOracle;
 use super::structs::Instance;
 use ark_serialize::{CanonicalSerialize, Compress};
 use icicle_core::traits::FieldImpl;
 
-/*
-    Instance: |H|, µ, [a], [b]
-    Prover sends: [r], [q]
-    Verifier sends: ß
-    Prover sends: a(ß), b(ß), r(ß), q(ß)
-    Verifier sends: ∂
-    Prover sends: [π]
-    Verifier checks:
-    1. a(ß) • b(ß) == ßr(ß) + µ/|H| + q(ß)•zH(ß)
-    2. e([a] + ∂[b] + ∂^2[r] + ∂^3[q] + ß[π] - [a(ß) + ∂b(ß) + ∂^2r(ß) + ∂^3q(ß), [1]) == e([π], [x])
-*/
 pub struct Transcript<C: Curve> {
     tr: TranscriptOracle<C::ScalarField>,
 }
 
 impl<C: Curve> Transcript<C> {
-    pub(crate) fn new(init_label: &'static [u8]) -> Self {
+    pub(crate) fn new_transcript(init_label: &'static [u8]) -> Self {
         Self {
-            tr: TranscriptOracle::new(init_label),
+            tr: TranscriptOracle::new_transcript(init_label),
         }
     }
 
